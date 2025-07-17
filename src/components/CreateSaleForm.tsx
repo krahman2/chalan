@@ -1,19 +1,25 @@
 import { useState, useMemo } from 'react';
-import type { Product, SaleItem, CreditInfo } from '../types';
+import type { Product, Sale, SaleItem, CreditInfo } from '../types';
 import { formatBDT } from '../utils/currency';
 
 interface CreateSaleFormProps {
   products: Product[];
+  sales: Sale[];
   onSave: (saleItems: SaleItem[], buyerName: string, creditInfo: CreditInfo) => void;
   onCancel: () => void;
 }
 
-const CreateSaleForm: React.FC<CreateSaleFormProps> = ({ products, onSave, onCancel }) => {
+const CreateSaleForm: React.FC<CreateSaleFormProps> = ({ products, sales, onSave, onCancel }) => {
   const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [buyerName, setBuyerName] = useState('');
   const [cashAmount, setCashAmount] = useState('');
   const [creditAmount, setCreditAmount] = useState('');
+
+  // Get unique buyer names from existing sales for autocomplete
+  const existingBuyers = useMemo(() => {
+    return Array.from(new Set(sales.map(s => s.buyerName))).sort();
+  }, [sales]);
 
   // Style definitions
   const inputStyle = {
@@ -144,11 +150,22 @@ const CreateSaleForm: React.FC<CreateSaleFormProps> = ({ products, onSave, onCan
           value={buyerName}
           onChange={(e) => setBuyerName(e.target.value)}
           style={inputStyle}
-          placeholder="Enter buyer/company name"
+          placeholder="Enter buyer/company name or select from existing"
+          list="existingBuyers"
           required
           onFocus={(e) => (e.target as HTMLInputElement).style.borderColor = '#3b82f6'}
           onBlur={(e) => (e.target as HTMLInputElement).style.borderColor = '#d1d5db'}
         />
+        <datalist id="existingBuyers">
+          {existingBuyers.map(buyer => (
+            <option key={buyer} value={buyer} />
+          ))}
+        </datalist>
+        {existingBuyers.length > 0 && (
+          <p style={{ fontSize: '12px', color: '#6b7280', margin: '4px 0 0 0' }}>
+            💡 Start typing to see existing customers ({existingBuyers.length} found)
+          </p>
+        )}
       </div>
 
       {/* Search Section */}

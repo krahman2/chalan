@@ -27,7 +27,7 @@ const EditProductForm: React.FC<EditProductFormProps> = ({ product, onSave, onCa
   ];
 
   const brands: ProductBrand[] = [
-    'TARGET', 'D.D', 'DD', 'Telco', 'Luk', 'LAP', 'LIPE', 'Eicher', 'C/A', 'S+B', 'S+S',
+    'TARGET', 'D.D', 'Telco', 'Luk', 'LAP', 'LIPE', 'Eicher', 'C/A', 'S+B', 'S+S',
     'MANISH', 'ABC', 'CALEX', 'KMP', 'DIN', 'KKK', 'BULL', 'HARISH', 'TVS', 'Mahindra',
     'VICTOR', 'NPN', 'J---6', 'LUCUS', 'PAYEN', 'KANSAI', 'BOSS', 'M.C.', 'Layparts',
     'Prizol', 'Daewoo', 'MOD', 'TKL', 'Other'

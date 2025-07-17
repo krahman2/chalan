@@ -1,14 +1,29 @@
 import { useState, useMemo } from 'react';
-import type { Sale } from '../types';
+import type { Sale, StandaloneCredit, Payment } from '../types';
 import { formatBDT } from '../utils/currency';
+import Modal from '../components/Modal';
+import AddCreditForm from '../components/AddCreditForm';
+import AddPaymentForm from '../components/AddPaymentForm';
 
 interface SalesHistoryProps {
   sales: Sale[];
+  standaloneCredits: StandaloneCredit[];
+  payments: Payment[];
   onCreateSale?: () => void;
   onDeleteSale?: (id: string) => void;
+  onAddCredit: (credit: Omit<StandaloneCredit, 'id'>) => void;
+  onAddPayment: (payment: Omit<Payment, 'id'>) => void;
 }
 
-const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onCreateSale, onDeleteSale }) => {
+const SalesHistory: React.FC<SalesHistoryProps> = ({ 
+  sales, 
+  standaloneCredits, 
+  payments, 
+  onCreateSale, 
+  onDeleteSale, 
+  onAddCredit, 
+  onAddPayment 
+}) => {
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
   const [showCreditView, setShowCreditView] = useState(false);
   const [buyerFilter, setBuyerFilter] = useState<string>('All');
@@ -16,8 +31,23 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onCreateSale, onDele
   const [timeFilter, setTimeFilter] = useState<'all' | 'week' | 'month' | 'year'>('all');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()); // 0-based month
+  
+  // Credit management states
+  const [isAddCreditModalOpen, setIsAddCreditModalOpen] = useState(false);
+  const [isAddPaymentModalOpen, setIsAddPaymentModalOpen] = useState(false);
 
   console.log('SalesHistory received sales:', sales);
+
+  // Credit management handlers
+  const handleAddCreditLocal = (credit: Omit<StandaloneCredit, 'id'>) => {
+    onAddCredit(credit);
+    setIsAddCreditModalOpen(false);
+  };
+
+  const handleAddPaymentLocal = (payment: Omit<Payment, 'id'>) => {
+    onAddPayment(payment);
+    setIsAddPaymentModalOpen(false);
+  };
 
   const toggleDetails = (saleId: string) => {
     setExpandedSaleId(expandedSaleId === saleId ? null : saleId);
@@ -128,6 +158,112 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onCreateSale, onDele
       return matchesBuyer && matchesSearch && matchesTime;
     });
   }, [sales, buyerFilter, searchTerm, timeFilter, selectedYear, selectedMonth]);
+
+  // Calculate net outstanding credit for each buyer
+  const calculateOutstandingCredit = useMemo(() => {
+    const creditMap = new Map<string, number>();
+    
+    // Add credit from sales
+    sales.forEach(sale => {
+      if (sale.creditInfo.creditAmount > 0) {
+        const current = creditMap.get(sale.buyerName) || 0;
+        creditMap.set(sale.buyerName, current + sale.creditInfo.creditAmount);
+      }
+    });
+    
+    // Add standalone credits
+    standaloneCredits.forEach(credit => {
+      const current = creditMap.get(credit.buyerName) || 0;
+      creditMap.set(credit.buyerName, current + credit.creditAmount);
+    });
+    
+    // Subtract payments
+    payments.forEach(payment => {
+      const current = creditMap.get(payment.buyerName) || 0;
+      creditMap.set(payment.buyerName, Math.max(0, current - payment.amount));
+    });
+    
+    return creditMap;
+  }, [sales, standaloneCredits, payments]);
+
+  // Create combined credit transactions for display
+  const allCreditTransactions = useMemo(() => {
+    const transactions: Array<{
+      id: string;
+      date: string;
+      buyerName: string;
+      type: 'sale' | 'standalone' | 'payment';
+      amount: number;
+      description: string;
+      items?: string;
+      originalData: Sale | StandaloneCredit | Payment;
+    }> = [];
+    
+    // Add sales with credit
+    sales.forEach(sale => {
+      if (sale.creditInfo.creditAmount > 0) {
+        transactions.push({
+          id: sale.id,
+          date: sale.date,
+          buyerName: sale.buyerName,
+          type: 'sale',
+          amount: sale.creditInfo.creditAmount,
+          description: `Sale - ${sale.items.length} item(s)`,
+          items: sale.items.map(item => item.productName).join(', '),
+          originalData: sale,
+        });
+      }
+    });
+    
+    // Add standalone credits
+    standaloneCredits.forEach(credit => {
+      transactions.push({
+        id: credit.id,
+        date: credit.date,
+        buyerName: credit.buyerName,
+        type: 'standalone',
+        amount: credit.creditAmount,
+        description: credit.description,
+        originalData: credit,
+      });
+    });
+    
+    // Add payments (negative amounts)
+    payments.forEach(payment => {
+      transactions.push({
+        id: payment.id,
+        date: payment.date,
+        buyerName: payment.buyerName,
+        type: 'payment',
+        amount: -payment.amount, // Negative because it reduces credit
+        description: payment.description || `Payment from ${payment.buyerName}`,
+        originalData: payment,
+      });
+    });
+    
+    return transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [sales, standaloneCredits, payments]);
+
+  // Filter credit transactions
+  const filteredCreditTransactions = useMemo(() => {
+    return allCreditTransactions.filter(transaction => {
+      const matchesBuyer = buyerFilter === 'All' || transaction.buyerName === buyerFilter;
+      const matchesSearch = transaction.buyerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (transaction.items && transaction.items.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      let matchesTime = true;
+      if (timeFilter === 'week') {
+        matchesTime = isInCurrentWeek(transaction.date);
+      } else if (timeFilter === 'month') {
+        matchesTime = isInSelectedMonth(transaction.date, selectedYear, selectedMonth);
+      } else if (timeFilter === 'year') {
+        matchesTime = isInSelectedYear(transaction.date, selectedYear);
+      }
+      
+      return matchesBuyer && matchesSearch && matchesTime;
+    });
+  }, [allCreditTransactions, buyerFilter, searchTerm, timeFilter, selectedYear, selectedMonth]);
 
   const creditSales = useMemo(() => {
     return filteredSales.filter(sale => sale.creditInfo.creditAmount > 0);
@@ -496,190 +632,282 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onCreateSale, onDele
     </div>
   );
 
-  const renderCreditView = () => (
-    <div>
-      <div style={{ marginBottom: '16px', padding: '16px', backgroundColor: '#fef3c7', borderRadius: '8px', border: '1px solid #f59e0b' }}>
-        <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#92400e', marginBottom: '8px' }}>
-          📊 Credit Summary
-        </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', fontSize: '14px' }}>
-          <div>
-            <strong>Total Credit Sales:</strong> {creditSales.length}
+  const renderCreditView = () => {
+    // Calculate summary stats for filtered transactions
+    const totalCreditTransactions = filteredCreditTransactions.filter(t => t.amount > 0).length;
+    const totalPaymentTransactions = filteredCreditTransactions.filter(t => t.amount < 0).length;
+    const totalCreditAmount = filteredCreditTransactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
+    const totalPaymentAmount = Math.abs(filteredCreditTransactions.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0));
+    
+    // Calculate outstanding for filtered buyer or all buyers
+    let outstandingAmount = 0;
+    if (buyerFilter !== 'All') {
+      outstandingAmount = calculateOutstandingCredit.get(buyerFilter) || 0;
+    } else {
+      outstandingAmount = Array.from(calculateOutstandingCredit.values()).reduce((sum, amount) => sum + amount, 0);
+    }
+
+    return (
+      <div>
+        <div style={{ marginBottom: '16px', padding: '16px', backgroundColor: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#0369a1', marginBottom: '8px' }}>
+            📊 Credit Summary {buyerFilter !== 'All' ? `- ${buyerFilter}` : ''}
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '16px', fontSize: '14px' }}>
+            <div>
+              <strong>Credit Transactions:</strong> {totalCreditTransactions}
+            </div>
+            <div>
+              <strong>Payment Transactions:</strong> {totalPaymentTransactions}
+            </div>
+            <div>
+              <strong>Total Credit Given:</strong> {formatBDT(totalCreditAmount)}
+            </div>
+            <div>
+              <strong>Total Payments Received:</strong> {formatBDT(totalPaymentAmount)}
+            </div>
           </div>
-          <div>
-            <strong>Total Credit Amount:</strong> {formatBDT(creditSales.reduce((sum, sale) => sum + sale.creditInfo.creditAmount, 0))}
-          </div>
-          <div>
-            <strong>Avg Credit per Sale:</strong> {formatBDT(creditSales.length > 0 ? (creditSales.reduce((sum, sale) => sum + sale.creditInfo.creditAmount, 0) / creditSales.length) : 0)}
+          <div style={{ 
+            marginTop: '12px', 
+            padding: '12px', 
+            backgroundColor: outstandingAmount > 0 ? '#fef2f2' : '#f0fdf4', 
+            borderRadius: '6px',
+            fontSize: '16px',
+            fontWeight: '600',
+            color: outstandingAmount > 0 ? '#dc2626' : '#166534',
+            textAlign: 'center',
+            border: outstandingAmount > 0 ? '1px solid #fecaca' : '1px solid #bbf7d0'
+          }}>
+            {buyerFilter !== 'All' 
+              ? `${buyerFilter} Outstanding Credit: ${formatBDT(outstandingAmount)}`
+              : `Total Outstanding Credit (All Buyers): ${formatBDT(outstandingAmount)}`
+            }
           </div>
         </div>
-      </div>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ minWidth: '100%', borderCollapse: 'collapse' }}>
-          <thead style={{
-            backgroundColor: '#f9fafb',
-            borderBottom: '1px solid #e5e7eb',
-          }}>
-            <tr>
-              <th style={{
-                padding: '16px 24px',
-                textAlign: 'left',
-                fontSize: '12px',
-                fontWeight: '600',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-              }}>Date</th>
-              <th style={{
-                padding: '16px 24px',
-                textAlign: 'left',
-                fontSize: '12px',
-                fontWeight: '600',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-              }}>Buyer</th>
-              <th style={{
-                padding: '16px 24px',
-                textAlign: 'left',
-                fontSize: '12px',
-                fontWeight: '600',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-              }}>Total Amount</th>
-              <th style={{
-                padding: '16px 24px',
-                textAlign: 'left',
-                fontSize: '12px',
-                fontWeight: '600',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-              }}>Cash Paid</th>
-              <th style={{
-                padding: '16px 24px',
-                textAlign: 'left',
-                fontSize: '12px',
-                fontWeight: '600',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-              }}>Credit Outstanding</th>
-              <th style={{
-                padding: '16px 24px',
-                textAlign: 'left',
-                fontSize: '12px',
-                fontWeight: '600',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-              }}>Items</th>
-              <th style={{
-                padding: '16px 24px',
-                textAlign: 'left',
-                fontSize: '12px',
-                fontWeight: '600',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-              }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {creditSales.map((sale) => (
-              <tr key={sale.id} style={{
-                borderBottom: '1px solid #e5e7eb',
-                transition: 'background-color 0.2s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget as HTMLTableRowElement).style.backgroundColor = '#f9fafb'}
-              onMouseLeave={(e) => (e.currentTarget as HTMLTableRowElement).style.backgroundColor = 'transparent'}
-              >
-                <td style={{
-                  padding: '20px 24px',
-                  whiteSpace: 'nowrap',
-                  fontSize: '14px',
-                  color: '#374151',
-                }}>
-                  {new Date(sale.date).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })}
-                </td>
-                <td style={{
-                  padding: '20px 24px',
-                  whiteSpace: 'nowrap',
-                  fontSize: '16px',
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ minWidth: '100%', borderCollapse: 'collapse' }}>
+            <thead style={{
+              backgroundColor: '#f9fafb',
+              borderBottom: '1px solid #e5e7eb',
+            }}>
+              <tr>
+                <th style={{
+                  padding: '16px 24px',
+                  textAlign: 'left',
+                  fontSize: '12px',
                   fontWeight: '600',
-                  color: '#374151',
-                }}>
-                  {sale.buyerName}
-                </td>
-                <td style={{
-                  padding: '20px 24px',
-                  whiteSpace: 'nowrap',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  color: '#1f2937',
-                }}>
-                  {formatBDT(sale.totalRevenue)}
-                </td>
-                <td style={{
-                  padding: '20px 24px',
-                  whiteSpace: 'nowrap',
-                  fontSize: '16px',
-                  color: '#059669',
-                }}>
-                  {formatBDT(sale.creditInfo.cashAmount)}
-                </td>
-                <td style={{
-                  padding: '20px 24px',
-                  whiteSpace: 'nowrap',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  color: '#dc2626',
-                }}>
-                  {formatBDT(sale.creditInfo.creditAmount)}
-                </td>
-                <td style={{
-                  padding: '20px 24px',
-                  whiteSpace: 'nowrap',
-                  fontSize: '14px',
                   color: '#6b7280',
-                }}>
-                  {sale.items.map(item => item.productName).join(', ')}
-                </td>
-                <td style={{
-                  padding: '20px 24px',
-                  whiteSpace: 'nowrap',
-                  fontSize: '16px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}>Date</th>
+                <th style={{
+                  padding: '16px 24px',
+                  textAlign: 'left',
+                  fontSize: '12px',
                   fontWeight: '600',
-                }}>
-                  {onDeleteSale && (
-                    <button
-                      onClick={() => handleDeleteSale(sale)}
-                      style={{
-                        ...buttonStyle,
-                        backgroundColor: '#dc2626',
-                        fontSize: '14px',
-                        padding: '6px 12px',
-                      }}
-                      onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#b91c1c'}
-                      onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#dc2626'}
-                    >
-                      🗑️ Delete
-                    </button>
-                  )}
-                </td>
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}>Buyer</th>
+                <th style={{
+                  padding: '16px 24px',
+                  textAlign: 'left',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}>Type</th>
+                <th style={{
+                  padding: '16px 24px',
+                  textAlign: 'left',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}>Amount</th>
+                <th style={{
+                  padding: '16px 24px',
+                  textAlign: 'left',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}>Description</th>
+                <th style={{
+                  padding: '16px 24px',
+                  textAlign: 'left',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}>Outstanding</th>
+                <th style={{
+                  padding: '16px 24px',
+                  textAlign: 'left',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredCreditTransactions.map((transaction) => {
+                const outstandingForBuyer = calculateOutstandingCredit.get(transaction.buyerName) || 0;
+                return (
+                  <tr key={transaction.id} style={{
+                    borderBottom: '1px solid #e5e7eb',
+                    transition: 'background-color 0.2s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget as HTMLTableRowElement).style.backgroundColor = '#f9fafb'}
+                  onMouseLeave={(e) => (e.currentTarget as HTMLTableRowElement).style.backgroundColor = 'transparent'}
+                  >
+                    <td style={{
+                      padding: '20px 24px',
+                      whiteSpace: 'nowrap',
+                      fontSize: '14px',
+                      color: '#374151',
+                    }}>
+                      {new Date(transaction.date).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </td>
+                    <td style={{
+                      padding: '20px 24px',
+                      whiteSpace: 'nowrap',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      color: '#374151',
+                    }}>
+                      {transaction.buyerName}
+                    </td>
+                    <td style={{
+                      padding: '20px 24px',
+                      whiteSpace: 'nowrap',
+                      fontSize: '14px',
+                    }}>
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        backgroundColor: 
+                          transaction.type === 'sale' ? '#dbeafe' :
+                          transaction.type === 'standalone' ? '#fee2e2' :
+                          '#dcfce7',
+                        color:
+                          transaction.type === 'sale' ? '#1e40af' :
+                          transaction.type === 'standalone' ? '#b91c1c' :
+                          '#166534',
+                      }}>
+                        {transaction.type === 'sale' ? '💰 Sale' :
+                         transaction.type === 'standalone' ? '💳 Credit' :
+                         '💸 Payment'}
+                      </span>
+                    </td>
+                    <td style={{
+                      padding: '20px 24px',
+                      whiteSpace: 'nowrap',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      color: transaction.amount > 0 ? '#dc2626' : '#059669',
+                    }}>
+                      {transaction.amount > 0 ? '+' : ''}{formatBDT(Math.abs(transaction.amount))}
+                    </td>
+                    <td style={{
+                      padding: '20px 24px',
+                      fontSize: '14px',
+                      color: '#6b7280',
+                      maxWidth: '200px',
+                    }}>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {transaction.description}
+                      </div>
+                      {transaction.items && (
+                        <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>
+                          {transaction.items}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{
+                      padding: '20px 24px',
+                      whiteSpace: 'nowrap',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      color: outstandingForBuyer > 0 ? '#dc2626' : '#059669',
+                    }}>
+                      {formatBDT(outstandingForBuyer)}
+                    </td>
+                    <td style={{
+                      padding: '20px 24px',
+                      whiteSpace: 'nowrap',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                    }}>
+                      {onDeleteSale && transaction.type === 'sale' && (
+                        <button
+                          onClick={() => handleDeleteSale(transaction.originalData as Sale)}
+                          style={{
+                            ...buttonStyle,
+                            backgroundColor: '#dc2626',
+                            fontSize: '14px',
+                            padding: '6px 12px',
+                          }}
+                          onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#b91c1c'}
+                          onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#dc2626'}
+                        >
+                          🗑️ Delete
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          
+          {/* Credit Table Footer with Totals */}
+          {filteredCreditTransactions.length > 0 && (
+            <div style={{
+              marginTop: '16px',
+              padding: '16px',
+              backgroundColor: '#f0f9ff',
+              borderRadius: '8px',
+              border: '1px solid #bae6fd',
+              textAlign: 'center',
+            }}>
+              <div style={{
+                fontSize: '18px',
+                fontWeight: '600',
+                color: '#0369a1',
+              }}>
+                {buyerFilter !== 'All' 
+                  ? `${buyerFilter} Net Outstanding Credit: ${formatBDT(outstandingAmount)}`
+                  : `Total Net Outstanding Credit (All Buyers): ${formatBDT(outstandingAmount)}`
+                }
+              </div>
+              <div style={{
+                fontSize: '14px',
+                color: '#6b7280',
+                marginTop: '4px',
+              }}>
+                {filteredCreditTransactions.length} transaction{filteredCreditTransactions.length !== 1 ? 's' : ''} shown
+                {totalPaymentAmount > 0 && ` • ${formatBDT(totalPaymentAmount)} total payments received`}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div style={{
@@ -726,16 +954,30 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onCreateSale, onDele
               </span>
               Sales History
             </h1>
-            {onCreateSale && (
+            <div style={{ display: 'flex', gap: '12px' }}>
               <button
-                onClick={onCreateSale}
-                style={addSaleButtonStyle}
-                onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#7c3aed'}
-                onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#8b5cf6'}
+                onClick={() => setIsAddCreditModalOpen(true)}
+                style={{
+                  ...addSaleButtonStyle,
+                  backgroundColor: '#dc2626',
+                }}
+                onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#b91c1c'}
+                onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#dc2626'}
               >
-                💰 Add Sale
+                💳 Add Credit
               </button>
-            )}
+              <button
+                onClick={() => setIsAddPaymentModalOpen(true)}
+                style={{
+                  ...addSaleButtonStyle,
+                  backgroundColor: '#059669',
+                }}
+                onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#047857'}
+                onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#059669'}
+              >
+                💰 Add Payment
+              </button>
+            </div>
           </div>
 
           {/* View Toggle and Filters */}
@@ -1008,6 +1250,33 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onCreateSale, onDele
           </div>
         ) : showCreditView ? renderCreditView() : renderMainView()}
       </div>
+
+      {/* Add Credit Modal */}
+      <Modal
+        isOpen={isAddCreditModalOpen}
+        onClose={() => setIsAddCreditModalOpen(false)}
+        title="Add Outstanding Credit"
+      >
+        <AddCreditForm
+          sales={sales}
+          onAddCredit={handleAddCreditLocal}
+          onCancel={() => setIsAddCreditModalOpen(false)}
+        />
+      </Modal>
+
+      {/* Add Payment Modal */}
+      <Modal
+        isOpen={isAddPaymentModalOpen}
+        onClose={() => setIsAddPaymentModalOpen(false)}
+        title="Record Payment"
+      >
+        <AddPaymentForm
+          sales={sales}
+          standaloneCredits={standaloneCredits}
+          onAddPayment={handleAddPaymentLocal}
+          onCancel={() => setIsAddPaymentModalOpen(false)}
+        />
+      </Modal>
     </div>
   );
 };

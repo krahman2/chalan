@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import type { Product, Sale } from '../types'
+import type { Product, Sale, StandaloneCredit, Payment } from '../types'
 
 // Helper functions to convert between camelCase and snake_case
 const convertProductFromDb = (dbProduct: any): Product => ({
@@ -44,6 +44,44 @@ const convertSaleToDb = (sale: Omit<Sale, 'id'> & { id?: string }) => ({
   total_revenue: sale.totalRevenue,
   items: sale.items,
   credit_info: sale.creditInfo,
+});
+
+const convertStandaloneCreditFromDb = (dbCredit: any): StandaloneCredit => ({
+  id: dbCredit.id,
+  buyerName: dbCredit.buyer_name,
+  creditAmount: Number(dbCredit.credit_amount),
+  description: dbCredit.description,
+  date: dbCredit.date,
+  isStandalone: dbCredit.is_standalone,
+});
+
+const convertStandaloneCreditToDb = (credit: Omit<StandaloneCredit, 'id'> & { id?: string }) => ({
+  id: credit.id || Date.now().toString(),
+  buyer_name: credit.buyerName,
+  credit_amount: credit.creditAmount,
+  description: credit.description,
+  date: credit.date,
+  is_standalone: credit.isStandalone,
+});
+
+const convertPaymentFromDb = (dbPayment: any): Payment => ({
+  id: dbPayment.id,
+  buyerName: dbPayment.buyer_name,
+  amount: Number(dbPayment.amount),
+  date: dbPayment.date,
+  description: dbPayment.description,
+  relatedSaleId: dbPayment.related_sale_id,
+  relatedCreditId: dbPayment.related_credit_id,
+});
+
+const convertPaymentToDb = (payment: Omit<Payment, 'id'> & { id?: string }) => ({
+  id: payment.id || Date.now().toString(),
+  buyer_name: payment.buyerName,
+  amount: payment.amount,
+  date: payment.date,
+  description: payment.description,
+  related_sale_id: payment.relatedSaleId,
+  related_credit_id: payment.relatedCreditId,
 });
 
 // Products Service
@@ -264,6 +302,145 @@ export class SaleService {
       }
     } catch (error) {
       console.warn('Failed to sync data to database:', error)
+    }
+  }
+}
+
+// Standalone Credits Service
+export const CreditService = {
+  async getAllStandaloneCredits(): Promise<StandaloneCredit[]> {
+    try {
+      const { data, error } = await supabase
+        .from('standalone_credits')
+        .select('*')
+        .order('date', { ascending: false })
+      
+      if (error) throw error
+      
+      return data ? data.map(convertStandaloneCreditFromDb) : []
+    } catch (error) {
+      console.error('Failed to fetch standalone credits from database:', error)
+      // Fallback to localStorage
+      const savedCredits = localStorage.getItem('standaloneCredits')
+      return savedCredits ? JSON.parse(savedCredits) : []
+    }
+  },
+
+  async createStandaloneCredit(credit: Omit<StandaloneCredit, 'id'>): Promise<StandaloneCredit> {
+    try {
+      console.log('Creating standalone credit with data:', credit)
+      const dbCredit = convertStandaloneCreditToDb(credit)
+      console.log('Converted to DB format:', dbCredit)
+      
+      const { data, error } = await supabase
+        .from('standalone_credits')
+        .insert([dbCredit])
+        .select()
+        .single()
+      
+      console.log('Supabase response:', { data, error })
+      
+      if (error) {
+        console.error('Supabase error details:', error)
+        throw error
+      }
+      
+      const createdCredit = convertStandaloneCreditFromDb(data)
+      
+      // Also save to localStorage as backup
+      const credits = await this.getAllStandaloneCredits()
+      const updatedCredits = [createdCredit, ...credits.filter(c => c.id !== createdCredit.id)]
+      localStorage.setItem('standaloneCredits', JSON.stringify(updatedCredits))
+      
+      return createdCredit
+    } catch (error) {
+      console.error('Failed to create standalone credit in database:', error)
+      throw error
+    }
+  },
+
+  async deleteStandaloneCredit(id: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('standalone_credits')
+        .delete()
+        .eq('id', id)
+      
+      if (error) throw error
+      
+      // Also remove from localStorage
+      const credits = await this.getAllStandaloneCredits()
+      const updatedCredits = credits.filter(c => c.id !== id)
+      localStorage.setItem('standaloneCredits', JSON.stringify(updatedCredits))
+    } catch (error) {
+      console.error('Failed to delete standalone credit from database:', error)
+      throw error
+    }
+  }
+}
+
+// Payments Service
+export const PaymentService = {
+  async getAllPayments(): Promise<Payment[]> {
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .order('date', { ascending: false })
+      
+      if (error) throw error
+      
+      return data ? data.map(convertPaymentFromDb) : []
+    } catch (error) {
+      console.error('Failed to fetch payments from database:', error)
+      // Fallback to localStorage
+      const savedPayments = localStorage.getItem('payments')
+      return savedPayments ? JSON.parse(savedPayments) : []
+    }
+  },
+
+  async createPayment(payment: Omit<Payment, 'id'>): Promise<Payment> {
+    try {
+      const dbPayment = convertPaymentToDb(payment)
+      
+      const { data, error } = await supabase
+        .from('payments')
+        .insert([dbPayment])
+        .select()
+        .single()
+      
+      if (error) throw error
+      
+      const createdPayment = convertPaymentFromDb(data)
+      
+      // Also save to localStorage as backup
+      const payments = await this.getAllPayments()
+      const updatedPayments = [createdPayment, ...payments.filter(p => p.id !== createdPayment.id)]
+      localStorage.setItem('payments', JSON.stringify(updatedPayments))
+      
+      return createdPayment
+    } catch (error) {
+      console.error('Failed to create payment in database:', error)
+      throw error
+    }
+  },
+
+  async deletePayment(id: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('payments')
+        .delete()
+        .eq('id', id)
+      
+      if (error) throw error
+      
+      // Also remove from localStorage
+      const payments = await this.getAllPayments()
+      const updatedPayments = payments.filter(p => p.id !== id)
+      localStorage.setItem('payments', JSON.stringify(updatedPayments))
+    } catch (error) {
+      console.error('Failed to delete payment from database:', error)
+      throw error
     }
   }
 } 

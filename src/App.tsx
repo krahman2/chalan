@@ -7,8 +7,8 @@ import Dashboard from './components/Dashboard';
 import Modal from './components/Modal';
 import CreateSaleForm from './components/CreateSaleForm';
 
-import { ProductService, SaleService } from './services/database';
-import type { Product, Sale, SaleItem, CreditInfo } from './types';
+import { ProductService, SaleService, CreditService, PaymentService } from './services/database';
+import type { Product, Sale, SaleItem, CreditInfo, StandaloneCredit, Payment } from './types';
 
 function App() {
   const [page, setPage] = useState<'inventory' | 'sales' | 'analysis'>('inventory');
@@ -16,6 +16,8 @@ function App() {
   const [isCreateSaleModalOpen, setIsCreateSaleModalOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
+  const [standaloneCredits, setStandaloneCredits] = useState<StandaloneCredit[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load initial data from database
@@ -32,6 +34,13 @@ function App() {
         const loadedSales = await SaleService.getAllSales();
         setSales(loadedSales);
         
+        // Load credits and payments from database
+        const loadedCredits = await CreditService.getAllStandaloneCredits();
+        const loadedPayments = await PaymentService.getAllPayments();
+        
+        setStandaloneCredits(loadedCredits);
+        setPayments(loadedPayments);
+        
         // Sync any existing localStorage data to database
         await SaleService.syncToDatabase();
         
@@ -40,9 +49,13 @@ function App() {
         // Fallback to localStorage or initial data
         const savedProducts = localStorage.getItem('products');
         const savedSales = localStorage.getItem('sales');
+        const savedCredits = localStorage.getItem('standaloneCredits');
+        const savedPayments = localStorage.getItem('payments');
         
         setProducts(savedProducts ? JSON.parse(savedProducts) : []);
         setSales(savedSales ? JSON.parse(savedSales) : []);
+        setStandaloneCredits(savedCredits ? JSON.parse(savedCredits) : []);
+        setPayments(savedPayments ? JSON.parse(savedPayments) : []);
       } finally {
         setIsLoading(false);
       }
@@ -147,6 +160,27 @@ function App() {
 
   const openCreateSaleModal = () => {
     setIsCreateSaleModalOpen(true);
+  };
+
+  // Credit and payment handlers
+  const handleAddCredit = async (credit: Omit<StandaloneCredit, 'id'>) => {
+    try {
+      const newCredit = await CreditService.createStandaloneCredit(credit);
+      setStandaloneCredits(prev => [newCredit, ...prev]);
+    } catch (error) {
+      console.error('Failed to add credit:', error);
+      alert('Failed to add credit. Please try again.');
+    }
+  };
+
+  const handleAddPayment = async (payment: Omit<Payment, 'id'>) => {
+    try {
+      const newPayment = await PaymentService.createPayment(payment);
+      setPayments(prev => [newPayment, ...prev]);
+    } catch (error) {
+      console.error('Failed to add payment:', error);
+      alert('Failed to add payment. Please try again.');
+    }
   };
 
   const navButtonStyle = (isActive: boolean) => ({
@@ -254,16 +288,14 @@ function App() {
               </button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              {(page === 'inventory' || page === 'analysis') && (
-                <button
-                  onClick={openCreateSaleModal}
-                  style={actionButtonStyle('#8b5cf6')}
-                  onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#7c3aed'}
-                  onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#8b5cf6'}
-                >
-                  💰 Add Sale
-                </button>
-              )}
+              <button
+                onClick={openCreateSaleModal}
+                style={actionButtonStyle('#8b5cf6')}
+                onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#7c3aed'}
+                onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#8b5cf6'}
+              >
+                💰 Add Sale
+              </button>
               <button
                 onClick={openAddProductModal}
                 style={actionButtonStyle('#10b981')}
@@ -304,7 +336,15 @@ function App() {
             />
           </div>
         ) : page === 'sales' ? (
-          <SalesHistory sales={sales} onCreateSale={openCreateSaleModal} onDeleteSale={deleteSale} />
+                      <SalesHistory 
+              sales={sales} 
+              standaloneCredits={standaloneCredits}
+              payments={payments}
+              onCreateSale={openCreateSaleModal} 
+              onDeleteSale={deleteSale}
+              onAddCredit={handleAddCredit}
+              onAddPayment={handleAddPayment}
+            />
         ) : (
           <InventoryAnalysis products={products} />
         )}
@@ -325,6 +365,7 @@ function App() {
       >
         <CreateSaleForm
           products={products}
+          sales={sales}
           onSave={recordSale}
           onCancel={() => setIsCreateSaleModalOpen(false)}
         />

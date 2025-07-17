@@ -57,19 +57,50 @@ CREATE TABLE sales (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Create standalone credits table
+CREATE TABLE standalone_credits (
+  id TEXT PRIMARY KEY,
+  buyer_name TEXT NOT NULL,
+  credit_amount DECIMAL(10,2) NOT NULL,
+  description TEXT NOT NULL,
+  date TIMESTAMP WITH TIME ZONE NOT NULL,
+  is_standalone BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create payments table
+CREATE TABLE payments (
+  id TEXT PRIMARY KEY,
+  buyer_name TEXT NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  date TIMESTAMP WITH TIME ZONE NOT NULL,
+  description TEXT,
+  related_sale_id TEXT,
+  related_credit_id TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Create indexes for better performance
 CREATE INDEX idx_products_name ON products(name);
 CREATE INDEX idx_products_category ON products(category);
 CREATE INDEX idx_sales_date ON sales(date);
 CREATE INDEX idx_sales_buyer ON sales(buyer_name);
+CREATE INDEX idx_standalone_credits_buyer ON standalone_credits(buyer_name);
+CREATE INDEX idx_standalone_credits_date ON standalone_credits(date);
+CREATE INDEX idx_payments_buyer ON payments(buyer_name);
+CREATE INDEX idx_payments_date ON payments(date);
 
 -- Enable Row Level Security (optional but recommended)
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
+ALTER TABLE standalone_credits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 
 -- Create policies to allow all operations (since it's single-user)
 CREATE POLICY "Allow all operations on products" ON products FOR ALL USING (true);
 CREATE POLICY "Allow all operations on sales" ON sales FOR ALL USING (true);
+CREATE POLICY "Allow all operations on standalone_credits" ON standalone_credits FOR ALL USING (true);
+CREATE POLICY "Allow all operations on payments" ON payments FOR ALL USING (true);
 ```
 
 ## Step 5: Test Connection

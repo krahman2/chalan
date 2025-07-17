@@ -47,8 +47,8 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
           borderRadius: '12px',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           width: '100%',
-          maxWidth: '500px',
-          maxHeight: '90vh',
+          maxWidth: '900px',
+          maxHeight: '95vh',
           overflow: 'hidden',
           position: 'relative'
         }}
@@ -90,8 +90,8 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
           </button>
         </div>
         <div style={{ 
-          padding: '24px',
-          maxHeight: 'calc(90vh - 120px)',
+          padding: '32px',
+          maxHeight: 'calc(95vh - 140px)',
           overflowY: 'auto'
         }}>
           {children}
