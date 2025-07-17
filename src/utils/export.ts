@@ -1,6 +1,5 @@
 // Export utilities for data backup and analysis
 import type { Product, Sale } from '../types';
-import { formatBDT } from './currency';
 
 export const exportProductsToCSV = (products: Product[]): void => {
   const headers = [
