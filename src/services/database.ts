@@ -12,6 +12,7 @@ const convertProductFromDb = (dbProduct: any): Product => ({
   purchasePrice: Number(dbProduct.purchase_price),
   sellingPrice: Number(dbProduct.selling_price),
   quantity: dbProduct.quantity,
+  pricing: dbProduct.pricing ? dbProduct.pricing : undefined,
 });
 
 const convertProductToDb = (product: Product) => ({
@@ -24,6 +25,7 @@ const convertProductToDb = (product: Product) => ({
   purchase_price: product.purchasePrice,
   selling_price: product.sellingPrice,
   quantity: product.quantity,
+  pricing: product.pricing || null,
 });
 
 const convertSaleFromDb = (dbSale: any): Sale => ({

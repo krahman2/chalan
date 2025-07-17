@@ -17,6 +17,19 @@ const EditProductForm: React.FC<EditProductFormProps> = ({ product, onSave, onCa
   const [purchasePrice, setPurchasePrice] = useState(product.purchasePrice);
   const [sellingPrice, setSellingPrice] = useState(product.sellingPrice);
   const [quantity, setQuantity] = useState(product.quantity);
+  const [dutyPerUnit, setDutyPerUnit] = useState(product.pricing?.dutyPerUnit || 0);
+  const [exchangeRate, setExchangeRate] = useState(product.pricing?.exchangeRate || 1);
+  const [originalAmount, setOriginalAmount] = useState(product.pricing?.originalAmount || 0);
+
+  const getCurrencySymbol = (currency: string): string => {
+    switch (currency) {
+      case 'USD': return '$';
+      case 'INR': return '₹';
+      case 'CNY': return '¥';
+      case 'BDT': return '৳';
+      default: return '৳';
+    }
+  };
 
   const categories: ProductCategory[] = [
     'Clutch & Pressure', 'Brake / Brake Lining', 'Propeller Shaft', 'Steering / Suspension',
@@ -35,6 +48,29 @@ const EditProductForm: React.FC<EditProductFormProps> = ({ product, onSave, onCa
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Calculate new final purchase price including duty
+    const basePrice = originalAmount && exchangeRate 
+      ? originalAmount * exchangeRate 
+      : originalAmount || purchasePrice;
+    
+    const newFinalPrice = basePrice + dutyPerUnit;
+    
+    // Update the pricing structure with new original amount, duty and exchange rate
+    const updatedPricing = product.pricing ? {
+      ...product.pricing,
+      originalAmount: originalAmount,
+      exchangeRate: product.pricing.currency !== 'BDT' ? exchangeRate : undefined,
+      dutyPerUnit: dutyPerUnit,
+      finalPurchasePrice: newFinalPrice,
+    } : {
+      originalAmount: originalAmount || purchasePrice,
+      currency: 'BDT' as const,
+      exchangeRate: undefined,
+      dutyPerUnit: dutyPerUnit,
+      finalPurchasePrice: newFinalPrice,
+    };
+    
     onSave({
       ...product,
       name,
@@ -42,9 +78,10 @@ const EditProductForm: React.FC<EditProductFormProps> = ({ product, onSave, onCa
       category,
       brand,
       country,
-      purchasePrice: purchasePrice,
+      purchasePrice: newFinalPrice, // Update legacy field to match calculated price
       sellingPrice: sellingPrice,
       quantity: quantity,
+      pricing: updatedPricing,
     });
   };
 
@@ -103,28 +140,44 @@ const EditProductForm: React.FC<EditProductFormProps> = ({ product, onSave, onCa
         </select>
       </td>
       <td style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb' }}>
-        <select
-          value={type}
-          onChange={(e) => setType(e.target.value as 'TATA' | 'Leyland' | 'Bedford' | 'Other')}
+        <input
+          type="number"
+          value={originalAmount}
+          onChange={(e) => setOriginalAmount(Number(e.target.value))}
           style={inputStyle}
-          required
-        >
-          <option value="TATA">TATA</option>
-          <option value="Leyland">Leyland</option>
-          <option value="Bedford">Bedford</option>
-          <option value="Other">Other</option>
-        </select>
+          step="0.01"
+          min="0"
+          placeholder="0.00"
+          disabled={!product.pricing?.currency || product.pricing?.currency === 'BDT'}
+        />
+        {product.pricing?.currency && product.pricing?.currency !== 'BDT' && (
+          <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>
+            {getCurrencySymbol(product.pricing.currency)} {product.pricing.currency}
+          </div>
+        )}
       </td>
       <td style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb' }}>
-        <select
-          value={country}
-          onChange={(e) => setCountry(e.target.value as Country)}
+        <input
+          type="number"
+          value={exchangeRate}
+          onChange={(e) => setExchangeRate(Number(e.target.value))}
           style={inputStyle}
-          required
-        >
-          <option value="India">India</option>
-          <option value="China">China</option>
-        </select>
+          step="0.01"
+          min="0.01"
+          placeholder="1.00"
+          disabled={!product.pricing?.currency || product.pricing?.currency === 'BDT'}
+        />
+      </td>
+      <td style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb' }}>
+        <input
+          type="number"
+          value={dutyPerUnit}
+          onChange={(e) => setDutyPerUnit(Number(e.target.value))}
+          style={inputStyle}
+          step="0.01"
+          min="0"
+          placeholder="0.00"
+        />
       </td>
       <td style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb' }}>
         <input
@@ -160,7 +213,12 @@ const EditProductForm: React.FC<EditProductFormProps> = ({ product, onSave, onCa
       </td>
       <td style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb' }}>
         <div style={{ fontSize: '16px', fontWeight: '600', color: '#059669' }}>
-          {formatBDT((sellingPrice - purchasePrice) * quantity)}
+          {formatBDT((() => {
+            const basePrice = originalAmount && exchangeRate 
+              ? originalAmount * exchangeRate 
+              : originalAmount || purchasePrice;
+            return (basePrice + dutyPerUnit) * quantity;
+          })())}
         </div>
       </td>
       <td style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb' }}>

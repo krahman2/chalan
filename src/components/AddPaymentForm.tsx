@@ -165,7 +165,7 @@ const AddPaymentForm: React.FC<AddPaymentFormProps> = ({
             <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
               <button
                 type="button"
-                onClick={() => setAmount((selectedBuyerCredit.amount / 2).toFixed(2))}
+                onClick={() => setAmount((Math.round(selectedBuyerCredit.amount / 2 * 100) / 100).toString())}
                 style={{
                   padding: '4px 8px',
                   fontSize: '12px',
@@ -179,7 +179,7 @@ const AddPaymentForm: React.FC<AddPaymentFormProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setAmount(selectedBuyerCredit.amount.toFixed(2))}
+                onClick={() => setAmount((Math.round(selectedBuyerCredit.amount * 100) / 100).toString())}
                 style={{
                   padding: '4px 8px',
                   fontSize: '12px',

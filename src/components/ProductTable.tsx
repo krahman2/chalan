@@ -120,6 +120,16 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onDeleteProduct, 
       '#374151',
   });
 
+  const getCurrencySymbol = (currency: string): string => {
+    switch (currency) {
+      case 'USD': return '$';
+      case 'INR': return '₹';
+      case 'CNY': return '¥';
+      case 'BDT': return '৳';
+      default: return '৳';
+    }
+  };
+
   const buttonStyle = (bgColor: string) => ({
     display: 'inline-flex',
     alignItems: 'center',
@@ -322,11 +332,8 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onDeleteProduct, 
                 color: '#6b7280',
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
-                cursor: 'pointer',
-              }}
-              onClick={() => handleSort('type')}
-              >
-                Type {getSortIcon('type')}
+              }}>
+                Original Price
               </th>
               <th style={{
                 padding: '16px 24px',
@@ -336,11 +343,8 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onDeleteProduct, 
                 color: '#6b7280',
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
-                cursor: 'pointer',
-              }}
-              onClick={() => handleSort('purchasePrice')}
-              >
-                Purchase {getSortIcon('purchasePrice')}
+              }}>
+                Exchange Rate
               </th>
               <th style={{
                 padding: '16px 24px',
@@ -363,9 +367,23 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onDeleteProduct, 
                 letterSpacing: '0.5px',
                 cursor: 'pointer',
               }}
+              onClick={() => handleSort('purchasePrice')}
+              >
+                Cost (BDT) {getSortIcon('purchasePrice')}
+              </th>
+              <th style={{
+                padding: '16px 24px',
+                textAlign: 'left',
+                fontSize: '12px',
+                fontWeight: '600',
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                cursor: 'pointer',
+              }}
               onClick={() => handleSort('sellingPrice')}
               >
-                Selling {getSortIcon('sellingPrice')}
+                Sell Price {getSortIcon('sellingPrice')}
               </th>
               <th style={{
                 padding: '16px 24px',
@@ -386,25 +404,11 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onDeleteProduct, 
                 textAlign: 'left',
                 fontSize: '12px',
                 fontWeight: '600',
-                color: '#6b7280',
+                color: '#059669',
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
               }}>
                 Inventory Value
-              </th>
-              <th style={{
-                padding: '16px 24px',
-                textAlign: 'left',
-                fontSize: '12px',
-                fontWeight: '600',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                cursor: 'pointer',
-              }}
-              onClick={() => handleSort('profit')}
-              >
-                Total Profit {getSortIcon('profit')}
               </th>
               <th style={{
                 padding: '16px 24px',
@@ -464,18 +468,13 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onDeleteProduct, 
                   <td style={{
                     padding: '20px 24px',
                     whiteSpace: 'nowrap',
+                    fontSize: '14px',
+                    color: '#6b7280',
                   }}>
-                    <span style={getTypeBadgeStyle(product.type)}>
-                      {product.type}
-                    </span>
-                  </td>
-                  <td style={{
-                    padding: '20px 24px',
-                    whiteSpace: 'nowrap',
-                    fontSize: '16px',
-                    color: '#374151',
-                  }}>
-                    {formatBDT(Number(product.purchasePrice))}
+                    {product.pricing?.originalAmount && product.pricing?.currency !== 'BDT' ? 
+                      `${getCurrencySymbol(product.pricing.currency)}${product.pricing.originalAmount.toFixed(2)}` : 
+                      ''
+                    }
                   </td>
                   <td style={{
                     padding: '20px 24px',
@@ -483,7 +482,26 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onDeleteProduct, 
                     fontSize: '14px',
                     color: '#6b7280',
                   }}>
-                    {product.pricing?.dutyPerUnit ? formatBDT(product.pricing.dutyPerUnit) : '₹0.00'}
+                    {product.pricing?.exchangeRate && product.pricing?.currency !== 'BDT' ? 
+                      `1 ${product.pricing.currency} = ৳${product.pricing.exchangeRate.toFixed(2)}` : 
+                      ''
+                    }
+                  </td>
+                  <td style={{
+                    padding: '20px 24px',
+                    whiteSpace: 'nowrap',
+                    fontSize: '14px',
+                    color: '#6b7280',
+                  }}>
+                    {product.pricing?.dutyPerUnit ? formatBDT(product.pricing.dutyPerUnit) : formatBDT(0)}
+                  </td>
+                  <td style={{
+                    padding: '20px 24px',
+                    whiteSpace: 'nowrap',
+                    fontSize: '16px',
+                    color: '#374151',
+                  }}>
+                    {formatBDT(product.pricing?.finalPurchasePrice || Number(product.purchasePrice))}
                   </td>
                   <td style={{
                     padding: '20px 24px',
@@ -506,18 +524,9 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onDeleteProduct, 
                     whiteSpace: 'nowrap',
                     fontSize: '16px',
                     fontWeight: '600',
-                    color: '#1f2937',
-                  }}>
-                    {formatBDT(Number(product.purchasePrice) * Number(product.quantity))}
-                  </td>
-                  <td style={{
-                    padding: '20px 24px',
-                    whiteSpace: 'nowrap',
-                    fontSize: '16px',
-                    fontWeight: '600',
                     color: '#059669',
                   }}>
-                    {formatBDT((Number(product.sellingPrice) - Number(product.purchasePrice)) * product.quantity)}
+                    {formatBDT(Number(product.purchasePrice) * Number(product.quantity))}
                   </td>
                   <td style={{
                     padding: '20px 24px',
