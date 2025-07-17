@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Product, ProductCategory, ProductBrand, Country } from '../types';
-import { formatBDT, formatBDTInput, parseBDT } from '../utils/currency';
+import { formatBDT } from '../utils/currency';
 
 interface EditProductFormProps {
   product: Product;

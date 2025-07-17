@@ -107,7 +107,7 @@ function App() {
     boxShadow: isActive ? '0 2px 4px rgba(59, 130, 246, 0.2)' : 'none',
   });
 
-  const actionButtonStyle = (bgColor: string, hoverColor: string) => ({
+  const actionButtonStyle = (bgColor: string) => ({
     backgroundColor: bgColor,
     color: 'white',
     fontWeight: '600',
@@ -184,7 +184,7 @@ function App() {
               {page === 'inventory' && (
                 <button
                   onClick={openCreateSaleModal}
-                  style={actionButtonStyle('#8b5cf6', '#7c3aed')}
+                  style={actionButtonStyle('#8b5cf6')}
                   onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#7c3aed'}
                   onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#8b5cf6'}
                 >
@@ -193,7 +193,7 @@ function App() {
               )}
               <button
                 onClick={openAddProductModal}
-                style={actionButtonStyle('#10b981', '#059669')}
+                style={actionButtonStyle('#10b981')}
                 onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#059669'}
                 onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#10b981'}
               >

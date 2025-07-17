@@ -37,15 +37,11 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onDeleteProduct, 
     setEditingProductId(null);
   };
 
-  const handleSellClick = (product: Product) => {
-    setSellingProduct(product);
-  };
-
   const handleCancelSell = () => {
     setSellingProduct(null);
   };
 
-  const handleConfirmSell = (quantity: number) => {
+  const handleConfirmSell = () => {
     if (sellingProduct) {
       setSellingProduct(null);
     }
@@ -135,7 +131,7 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onDeleteProduct, 
     color: country === 'India' ? '#92400e' : '#991b1b',
   });
 
-  const buttonStyle = (bgColor: string, hoverColor: string) => ({
+  const buttonStyle = (bgColor: string) => ({
     display: 'inline-flex',
     alignItems: 'center',
     padding: '8px 16px',
@@ -526,7 +522,7 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onDeleteProduct, 
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button
                         onClick={() => handleEditClick(product.id)}
-                        style={buttonStyle('#3b82f6', '#2563eb')}
+                        style={buttonStyle('#3b82f6')}
                         onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#2563eb'}
                         onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#3b82f6'}
                       >
@@ -534,7 +530,7 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onDeleteProduct, 
                       </button>
                       <button
                         onClick={() => onDeleteProduct(product.id)}
-                        style={buttonStyle('#dc2626', '#b91c1c')}
+                        style={buttonStyle('#dc2626')}
                         onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#b91c1c'}
                         onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#dc2626'}
                       >

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Product, ProductCategory, ProductBrand, Country } from '../types';
-import { formatBDTInput, parseBDT } from '../utils/currency';
+
 
 interface AddProductFormProps {
   onAddProduct: (product: Omit<Product, 'id'>) => void;
