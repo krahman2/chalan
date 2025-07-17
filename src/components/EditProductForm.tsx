@@ -10,10 +10,8 @@ interface EditProductFormProps {
 
 const EditProductForm: React.FC<EditProductFormProps> = ({ product, onSave, onCancel }) => {
   const [name, setName] = useState(product.name);
-  const [type, setType] = useState<'TATA' | 'Leyland' | 'Bedford' | 'Other'>(product.type);
   const [category, setCategory] = useState<ProductCategory>(product.category);
   const [brand, setBrand] = useState<ProductBrand>(product.brand);
-  const [country, setCountry] = useState<Country>(product.country);
   const [purchasePrice, setPurchasePrice] = useState(product.purchasePrice);
   const [sellingPrice, setSellingPrice] = useState(product.sellingPrice);
   const [quantity, setQuantity] = useState(product.quantity);
@@ -74,10 +72,10 @@ const EditProductForm: React.FC<EditProductFormProps> = ({ product, onSave, onCa
     onSave({
       ...product,
       name,
-      type,
+      type: product.type,
       category,
       brand,
-      country,
+      country: product.country,
       purchasePrice: newFinalPrice, // Update legacy field to match calculated price
       sellingPrice: sellingPrice,
       quantity: quantity,

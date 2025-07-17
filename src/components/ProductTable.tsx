@@ -101,25 +101,6 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onDeleteProduct, 
     return Array.from(new Set(products.map(p => p.brand))).sort();
   }, [products]);
 
-  const getTypeBadgeStyle = (type: string) => ({
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: '4px 8px',
-    fontSize: '12px',
-    fontWeight: '600',
-    borderRadius: '12px',
-    backgroundColor: 
-      type === 'TATA' ? '#dbeafe' :
-      type === 'Leyland' ? '#dcfce7' :
-      type === 'Bedford' ? '#f3e8ff' :
-      '#f3f4f6',
-    color:
-      type === 'TATA' ? '#1e40af' :
-      type === 'Leyland' ? '#166534' :
-      type === 'Bedford' ? '#7c3aed' :
-      '#374151',
-  });
-
   const getCurrencySymbol = (currency: string): string => {
     switch (currency) {
       case 'USD': return '$';
