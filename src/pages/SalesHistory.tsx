@@ -30,9 +30,7 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onCreateSale }) => {
     return new Date(d.setDate(diff));
   };
 
-  const getMonthStart = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1);
-  };
+
 
   const isInCurrentWeek = (saleDate: string) => {
     const sale = new Date(saleDate);
