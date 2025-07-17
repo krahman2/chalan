@@ -6,7 +6,7 @@ import InventoryAnalysis from './pages/InventoryAnalysis';
 import Dashboard from './components/Dashboard';
 import Modal from './components/Modal';
 import CreateSaleForm from './components/CreateSaleForm';
-import { products as initialProducts } from './data/products';
+
 import { ProductService, SaleService } from './services/database';
 import type { Product, Sale, SaleItem, CreditInfo } from './types';
 
@@ -25,17 +25,7 @@ function App() {
         setIsLoading(true);
         
         // Load products
-        let loadedProducts = await ProductService.getAllProducts();
-        
-        // If no products in database, seed with initial data
-        if (loadedProducts.length === 0) {
-          console.log('No products found, seeding with initial data...');
-          for (const product of initialProducts) {
-            await ProductService.createProduct(product);
-          }
-          loadedProducts = await ProductService.getAllProducts();
-        }
-        
+        const loadedProducts = await ProductService.getAllProducts();
         setProducts(loadedProducts);
         
         // Load sales
@@ -51,7 +41,7 @@ function App() {
         const savedProducts = localStorage.getItem('products');
         const savedSales = localStorage.getItem('sales');
         
-        setProducts(savedProducts ? JSON.parse(savedProducts) : initialProducts);
+        setProducts(savedProducts ? JSON.parse(savedProducts) : []);
         setSales(savedSales ? JSON.parse(savedSales) : []);
       } finally {
         setIsLoading(false);
