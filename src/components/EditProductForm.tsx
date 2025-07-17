@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Product, ProductCategory, ProductBrand, Country } from '../types';
+import type { Product, ProductCategory, ProductBrand } from '../types';
 import { formatBDT } from '../utils/currency';
 
 interface EditProductFormProps {
