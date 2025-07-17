@@ -194,16 +194,10 @@ const Dashboard: React.FC<DashboardProps> = ({ products, sales }) => {
           color="#dc2626"
         />
         <StatDisplay 
-          label={weeklySalesCount === 1 ? "This Week" : "This Week"} 
-          value={`${weeklySalesCount} sale${weeklySalesCount !== 1 ? 's' : ''}`}
+          label="Sales Activity" 
+          value={`${weeklySalesCount} this week • ${monthlySalesCount} this month`}
           icon="📈"
           color="#059669"
-        />
-        <StatDisplay 
-          label={monthlySalesCount === 1 ? "This Month" : "This Month"} 
-          value={`${monthlySalesCount} sale${monthlySalesCount !== 1 ? 's' : ''}`}
-          icon="📅"
-          color="#7c3aed"
         />
       </div>
     </div>

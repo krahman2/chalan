@@ -179,14 +179,6 @@ const InventoryAnalysis: React.FC<InventoryAnalysisProps> = ({ products }) => {
             </span>
             Inventory Analysis
           </h1>
-          <p style={{
-            fontSize: '16px',
-            color: '#6b7280',
-            margin: '0',
-            fontWeight: '500',
-          }}>
-            Analyze your inventory by category, brand, country, and vehicle type
-          </p>
         </div>
 
         {/* Filters */}
@@ -344,6 +336,14 @@ const InventoryAnalysis: React.FC<InventoryAnalysisProps> = ({ products }) => {
               marginBottom: '6px',
             }}>
               Search Products
+              <span style={{
+                fontSize: '12px',
+                fontWeight: '400',
+                color: '#6b7280',
+                marginLeft: '8px',
+              }}>
+                ({totals.productCount} found)
+              </span>
             </label>
             <input
               type="text"
@@ -370,12 +370,6 @@ const InventoryAnalysis: React.FC<InventoryAnalysisProps> = ({ products }) => {
             gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
             gap: '20px',
           }}>
-            <div style={cardStyle}>
-              <div style={{ fontSize: '14px', color: '#6b7280', fontWeight: '600' }}>Products Found</div>
-              <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#8b5cf6' }}>
-                {totals.productCount}
-              </div>
-            </div>
             <div style={cardStyle}>
               <div style={{ fontSize: '14px', color: '#6b7280', fontWeight: '600' }}>Total Quantity</div>
               <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#059669' }}>
