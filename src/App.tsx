@@ -6,84 +6,138 @@ import Dashboard from './components/Dashboard';
 import Modal from './components/Modal';
 import CreateSaleForm from './components/CreateSaleForm';
 import { products as initialProducts } from './data/products';
+import { ProductService, SaleService } from './services/database';
 import type { Product, Sale, SaleItem, CreditInfo } from './types';
 
 function App() {
   const [page, setPage] = useState('inventory');
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
   const [isCreateSaleModalOpen, setIsCreateSaleModalOpen] = useState(false);
-  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [sales, setSales] = useState<Sale[]>(() => {
-    const savedSales = localStorage.getItem('sales');
-    return savedSales ? JSON.parse(savedSales) : [];
-  });
-
+  // Load initial data from database
   useEffect(() => {
-    localStorage.setItem('products', JSON.stringify(products));
-  }, [products]);
-
-  useEffect(() => {
-    localStorage.setItem('sales', JSON.stringify(sales));
-  }, [sales]);
-
-  const addProduct = (product: Omit<Product, 'id'>) => {
-    setProducts([
-      ...products,
-      {
-        ...product,
-        id: (products.length + 1).toString(),
-      },
-    ]);
-    setIsAddProductModalOpen(false);
-  };
-
-  const deleteProduct = (id: string) => {
-    setProducts(products.filter((product) => product.id !== id));
-  };
-
-  const updateProduct = (updatedProduct: Product) => {
-    setProducts(
-      products.map((product) =>
-        product.id === updatedProduct.id ? updatedProduct : product
-      )
-    );
-  };
-
-  const recordSale = (saleItems: SaleItem[], buyerName: string, creditInfo: CreditInfo) => {
-    const totalRevenue = saleItems.reduce((sum, item) => sum + item.sellingPrice * item.quantity, 0);
-    const totalProfit = saleItems.reduce((sum, item) => sum + item.profit * item.quantity, 0);
-
-    const sale: Sale = {
-      id: Date.now().toString(),
-      date: new Date().toISOString(),
-      items: saleItems,
-      totalProfit: totalProfit,
-      totalRevenue: totalRevenue,
-      buyerName: buyerName,
-      creditInfo: creditInfo,
+    const loadInitialData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Load products
+        let loadedProducts = await ProductService.getAllProducts();
+        
+        // If no products in database, seed with initial data
+        if (loadedProducts.length === 0) {
+          console.log('No products found, seeding with initial data...');
+          for (const product of initialProducts) {
+            await ProductService.createProduct(product);
+          }
+          loadedProducts = await ProductService.getAllProducts();
+        }
+        
+        setProducts(loadedProducts);
+        
+        // Load sales
+        const loadedSales = await SaleService.getAllSales();
+        setSales(loadedSales);
+        
+        // Sync any existing localStorage data to database
+        await SaleService.syncToDatabase();
+        
+      } catch (error) {
+        console.error('Failed to load initial data:', error);
+        // Fallback to localStorage or initial data
+        const savedProducts = localStorage.getItem('products');
+        const savedSales = localStorage.getItem('sales');
+        
+        setProducts(savedProducts ? JSON.parse(savedProducts) : initialProducts);
+        setSales(savedSales ? JSON.parse(savedSales) : []);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    console.log('Recording sale:', sale);
-    console.log('Current sales before update:', sales);
-    
-    // Update sales state
-    setSales(prev => {
-      const newSales = [...prev, sale];
-      console.log('New sales array:', newSales);
-      return newSales;
-    });
+    loadInitialData();
+  }, []);
 
-    // Update product quantities
-    saleItems.forEach(item => {
-      setProducts(prev => prev.map(product => 
-        product.id === item.productId 
-          ? { ...product, quantity: product.quantity - item.quantity }
-          : product
-      ));
-    });
+  const addProduct = async (product: Omit<Product, 'id'>) => {
+    try {
+      const newProduct = await ProductService.createProduct(product);
+      setProducts([...products, newProduct]);
+      setIsAddProductModalOpen(false);
+    } catch (error) {
+      console.error('Failed to add product:', error);
+      alert('Failed to add product. Please try again.');
+    }
+  };
 
-    setIsCreateSaleModalOpen(false);
+  const deleteProduct = async (id: string) => {
+    try {
+      await ProductService.deleteProduct(id);
+      setProducts(products.filter((product) => product.id !== id));
+    } catch (error) {
+      console.error('Failed to delete product:', error);
+      alert('Failed to delete product. Please try again.');
+    }
+  };
+
+  const updateProduct = async (updatedProduct: Product) => {
+    try {
+      const updated = await ProductService.updateProduct(updatedProduct);
+      setProducts(
+        products.map((product) =>
+          product.id === updatedProduct.id ? updated : product
+        )
+      );
+    } catch (error) {
+      console.error('Failed to update product:', error);
+      alert('Failed to update product. Please try again.');
+    }
+  };
+
+  const recordSale = async (saleItems: SaleItem[], buyerName: string, creditInfo: CreditInfo) => {
+    try {
+      const totalRevenue = saleItems.reduce((sum, item) => sum + item.sellingPrice * item.quantity, 0);
+      const totalProfit = saleItems.reduce((sum, item) => sum + item.profit * item.quantity, 0);
+
+      const saleData = {
+        date: new Date().toISOString(),
+        items: saleItems,
+        totalProfit: totalProfit,
+        totalRevenue: totalRevenue,
+        buyerName: buyerName,
+        creditInfo: creditInfo,
+      };
+
+      console.log('Recording sale:', saleData);
+      
+      // Create sale in database
+      const newSale = await SaleService.createSale(saleData);
+      
+      // Update sales state
+      setSales(prev => [newSale, ...prev]);
+
+      // Update product quantities in database and local state
+      for (const item of saleItems) {
+        const product = products.find(p => p.id === item.productId);
+        if (product) {
+          const updatedProduct = {
+            ...product,
+            quantity: product.quantity - item.quantity
+          };
+          await ProductService.updateProduct(updatedProduct);
+        }
+      }
+      
+      // Refresh products from database to ensure consistency
+      const updatedProducts = await ProductService.getAllProducts();
+      setProducts(updatedProducts);
+
+      setIsCreateSaleModalOpen(false);
+    } catch (error) {
+      console.error('Failed to record sale:', error);
+      alert('Failed to record sale. Please try again.');
+    }
   };
 
   const openAddProductModal = () => {
@@ -210,7 +264,18 @@ function App() {
         margin: '0 auto',
         padding: '32px 16px',
       }}>
-        {page === 'inventory' ? (
+        {isLoading ? (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '400px',
+            fontSize: '18px',
+            color: '#6b7280',
+          }}>
+            Loading your data...
+          </div>
+        ) : page === 'inventory' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <Dashboard products={products} />
             <ProductTable
