@@ -12,11 +12,89 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onCreateSale }) => {
   const [showCreditView, setShowCreditView] = useState(false);
   const [buyerFilter, setBuyerFilter] = useState<string>('All');
   const [searchTerm, setSearchTerm] = useState('');
+  const [timeFilter, setTimeFilter] = useState<'all' | 'week' | 'month' | 'year'>('all');
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()); // 0-based month
 
   console.log('SalesHistory received sales:', sales);
 
   const toggleDetails = (saleId: string) => {
     setExpandedSaleId(expandedSaleId === saleId ? null : saleId);
+  };
+
+  // Helper functions for time filtering
+  const getWeekStart = (date: Date) => {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day; // Sunday as start of week
+    return new Date(d.setDate(diff));
+  };
+
+  const getMonthStart = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1);
+  };
+
+  const isInCurrentWeek = (saleDate: string) => {
+    const sale = new Date(saleDate);
+    const now = new Date();
+    const weekStart = getWeekStart(now);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 7);
+    return sale >= weekStart && sale < weekEnd;
+  };
+
+  const isInSelectedMonth = (saleDate: string, year: number, month: number) => {
+    const sale = new Date(saleDate);
+    return sale.getFullYear() === year && sale.getMonth() === month;
+  };
+
+  const isInSelectedYear = (saleDate: string, year: number) => {
+    const sale = new Date(saleDate);
+    return sale.getFullYear() === year;
+  };
+
+  // Helper functions for navigation
+  const getMonthName = (month: number) => {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'];
+    return months[month];
+  };
+
+  const goToPreviousMonth = () => {
+    if (selectedMonth === 0) {
+      setSelectedMonth(11);
+      setSelectedYear(selectedYear - 1);
+    } else {
+      setSelectedMonth(selectedMonth - 1);
+    }
+  };
+
+  const goToNextMonth = () => {
+    if (selectedMonth === 11) {
+      setSelectedMonth(0);
+      setSelectedYear(selectedYear + 1);
+    } else {
+      setSelectedMonth(selectedMonth + 1);
+    }
+  };
+
+  const goToPreviousYear = () => {
+    setSelectedYear(selectedYear - 1);
+  };
+
+  const goToNextYear = () => {
+    setSelectedYear(selectedYear + 1);
+  };
+
+  // Reset to current when switching filter types
+  const handleTimeFilterChange = (newFilter: 'all' | 'week' | 'month' | 'year') => {
+    setTimeFilter(newFilter);
+    if (newFilter === 'month') {
+      setSelectedMonth(new Date().getMonth());
+      setSelectedYear(new Date().getFullYear());
+    } else if (newFilter === 'year') {
+      setSelectedYear(new Date().getFullYear());
+    }
   };
 
   const uniqueBuyers = useMemo(() => {
@@ -28,12 +106,37 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onCreateSale }) => {
       const matchesBuyer = buyerFilter === 'All' || sale.buyerName === buyerFilter;
       const matchesSearch = sale.buyerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            sale.items.some(item => item.productName.toLowerCase().includes(searchTerm.toLowerCase()));
-      return matchesBuyer && matchesSearch;
+      
+      let matchesTime = true;
+      if (timeFilter === 'week') {
+        matchesTime = isInCurrentWeek(sale.date);
+      } else if (timeFilter === 'month') {
+        matchesTime = isInSelectedMonth(sale.date, selectedYear, selectedMonth);
+      } else if (timeFilter === 'year') {
+        matchesTime = isInSelectedYear(sale.date, selectedYear);
+      }
+      
+      return matchesBuyer && matchesSearch && matchesTime;
     });
-  }, [sales, buyerFilter, searchTerm]);
+  }, [sales, buyerFilter, searchTerm, timeFilter, selectedYear, selectedMonth]);
 
   const creditSales = useMemo(() => {
     return filteredSales.filter(sale => sale.creditInfo.creditAmount > 0);
+  }, [filteredSales]);
+
+  // Calculate summary statistics for the current period
+  const periodStats = useMemo(() => {
+    const totalRevenue = filteredSales.reduce((sum, sale) => sum + sale.totalRevenue, 0);
+    const totalProfit = filteredSales.reduce((sum, sale) => sum + sale.totalProfit, 0);
+    const totalSales = filteredSales.length;
+    const avgSaleValue = totalSales > 0 ? totalRevenue / totalSales : 0;
+    
+    return {
+      totalRevenue,
+      totalProfit,
+      totalSales,
+      avgSaleValue,
+    };
   }, [filteredSales]);
 
   const buttonStyle = {
@@ -627,6 +730,111 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onCreateSale }) => {
               onFocus={(e) => (e.target as HTMLInputElement).style.borderColor = '#3b82f6'}
               onBlur={(e) => (e.target as HTMLInputElement).style.borderColor = '#d1d5db'}
             />
+            
+            {/* Time Filter Separator */}
+            <div style={{ height: '24px', width: '1px', backgroundColor: '#d1d5db', margin: '0 4px' }}></div>
+            
+            {/* Time Period Dropdown */}
+            <select
+              value={timeFilter}
+              onChange={(e) => handleTimeFilterChange(e.target.value as 'all' | 'week' | 'month' | 'year')}
+              style={{
+                ...filterStyle,
+                minWidth: '120px',
+                fontWeight: '600',
+              }}
+            >
+              <option value="all">📅 All Time</option>
+              <option value="week">📈 This Week</option>
+              <option value="month">📊 Monthly</option>
+              <option value="year">📆 Yearly</option>
+            </select>
+
+            {/* Month Navigation */}
+            {timeFilter === 'month' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  onClick={goToPreviousMonth}
+                  style={{
+                    ...buttonStyle,
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    padding: '6px 12px',
+                    fontSize: '14px',
+                  }}
+                  onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#e5e7eb'}
+                  onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#f3f4f6'}
+                >
+                  ← Prev
+                </button>
+                <span style={{
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  color: '#10b981',
+                  minWidth: '150px',
+                  textAlign: 'center',
+                }}>
+                  {getMonthName(selectedMonth)} {selectedYear}
+                </span>
+                <button
+                  onClick={goToNextMonth}
+                  style={{
+                    ...buttonStyle,
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    padding: '6px 12px',
+                    fontSize: '14px',
+                  }}
+                  onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#e5e7eb'}
+                  onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#f3f4f6'}
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+
+            {/* Year Navigation */}
+            {timeFilter === 'year' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  onClick={goToPreviousYear}
+                  style={{
+                    ...buttonStyle,
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    padding: '6px 12px',
+                    fontSize: '14px',
+                  }}
+                  onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#e5e7eb'}
+                  onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#f3f4f6'}
+                >
+                  ← Prev
+                </button>
+                <span style={{
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  color: '#10b981',
+                  minWidth: '80px',
+                  textAlign: 'center',
+                }}>
+                  {selectedYear}
+                </span>
+                <button
+                  onClick={goToNextYear}
+                  style={{
+                    ...buttonStyle,
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    padding: '6px 12px',
+                    fontSize: '14px',
+                  }}
+                  onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#e5e7eb'}
+                  onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#f3f4f6'}
+                >
+                  Next →
+                </button>
+              </div>
+            )}
           </div>
 
           <p style={{
@@ -638,6 +846,83 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onCreateSale }) => {
             {showCreditView ? 'Track outstanding credit amounts and payment details' : 'Track your sales performance and revenue'}
           </p>
         </div>
+
+        {/* Period Summary */}
+        {timeFilter !== 'all' && filteredSales.length > 0 && (
+          <div style={{
+            backgroundColor: '#f0fdf4',
+            borderRadius: '12px',
+            padding: '20px',
+            border: '1px solid #bbf7d0',
+            marginBottom: '24px',
+          }}>
+            <h3 style={{
+              fontSize: '18px',
+              fontWeight: '600',
+              color: '#166534',
+              marginBottom: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}>
+              {timeFilter === 'week' 
+                ? '📈 This Week' 
+                : timeFilter === 'month' 
+                ? `📊 ${getMonthName(selectedMonth)} ${selectedYear}` 
+                : `📆 ${selectedYear}`} Summary
+            </h3>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '16px',
+            }}>
+              <div style={{
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                padding: '16px',
+                border: '1px solid #bbf7d0',
+              }}>
+                <div style={{ fontSize: '14px', color: '#166534', fontWeight: '600' }}>Total Sales</div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#15803d' }}>
+                  {periodStats.totalSales}
+                </div>
+              </div>
+              <div style={{
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                padding: '16px',
+                border: '1px solid #bbf7d0',
+              }}>
+                <div style={{ fontSize: '14px', color: '#166534', fontWeight: '600' }}>Total Revenue</div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#15803d' }}>
+                  {formatBDT(periodStats.totalRevenue)}
+                </div>
+              </div>
+              <div style={{
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                padding: '16px',
+                border: '1px solid #bbf7d0',
+              }}>
+                <div style={{ fontSize: '14px', color: '#166534', fontWeight: '600' }}>Total Profit</div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#15803d' }}>
+                  {formatBDT(periodStats.totalProfit)}
+                </div>
+              </div>
+              <div style={{
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                padding: '16px',
+                border: '1px solid #bbf7d0',
+              }}>
+                <div style={{ fontSize: '14px', color: '#166534', fontWeight: '600' }}>Avg Sale Value</div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#15803d' }}>
+                  {formatBDT(periodStats.avgSaleValue)}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {sales.length === 0 ? (
           <div style={{
