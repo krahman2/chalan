@@ -215,6 +215,28 @@ export class SaleService {
     }
   }
 
+  static async deleteSale(id: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('sales')
+        .delete()
+        .eq('id', id)
+      
+      if (error) throw error
+      
+      // Also remove from localStorage
+      const sales = await this.getAllSales()
+      const updatedSales = sales.filter(s => s.id !== id)
+      localStorage.setItem('sales', JSON.stringify(updatedSales))
+    } catch (error) {
+      console.warn('Failed to delete sale from database, using localStorage:', error)
+      // Fallback to localStorage
+      const sales = await this.getAllSales()
+      const updatedSales = sales.filter(s => s.id !== id)
+      localStorage.setItem('sales', JSON.stringify(updatedSales))
+    }
+  }
+
   static async syncToDatabase(): Promise<void> {
     try {
       // Sync products from localStorage to database

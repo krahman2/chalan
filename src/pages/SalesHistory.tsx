@@ -5,9 +5,10 @@ import { formatBDT } from '../utils/currency';
 interface SalesHistoryProps {
   sales: Sale[];
   onCreateSale?: () => void;
+  onDeleteSale?: (id: string) => void;
 }
 
-const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onCreateSale }) => {
+const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onCreateSale, onDeleteSale }) => {
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
   const [showCreditView, setShowCreditView] = useState(false);
   const [buyerFilter, setBuyerFilter] = useState<string>('All');
@@ -20,6 +21,16 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onCreateSale }) => {
 
   const toggleDetails = (saleId: string) => {
     setExpandedSaleId(expandedSaleId === saleId ? null : saleId);
+  };
+
+  const handleDeleteSale = (sale: Sale) => {
+    if (!onDeleteSale) return;
+    
+    const confirmMessage = `Are you sure you want to delete this sale?\n\nBuyer: ${sale.buyerName}\nDate: ${new Date(sale.date).toLocaleDateString()}\nRevenue: ${formatBDT(sale.totalRevenue)}\n\nThis action cannot be undone.`;
+    
+    if (window.confirm(confirmMessage)) {
+      onDeleteSale(sale.id);
+    }
   };
 
   // Helper functions for time filtering
@@ -346,14 +357,29 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onCreateSale }) => {
                   fontSize: '16px',
                   fontWeight: '600',
                 }}>
-                  <button
-                    onClick={() => toggleDetails(sale.id)}
-                    style={buttonStyle}
-                    onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#2563eb'}
-                    onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#3b82f6'}
-                  >
-                    {expandedSaleId === sale.id ? '📤 Hide Details' : '📋 View Details'}
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => toggleDetails(sale.id)}
+                      style={buttonStyle}
+                      onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#2563eb'}
+                      onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#3b82f6'}
+                    >
+                      {expandedSaleId === sale.id ? '📤 Hide Details' : '📋 View Details'}
+                    </button>
+                    {onDeleteSale && (
+                      <button
+                        onClick={() => handleDeleteSale(sale)}
+                        style={{
+                          ...buttonStyle,
+                          backgroundColor: '#dc2626',
+                        }}
+                        onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#b91c1c'}
+                        onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#dc2626'}
+                      >
+                        🗑️ Delete
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
               {expandedSaleId === sale.id && (
@@ -550,6 +576,15 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onCreateSale }) => {
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
               }}>Items</th>
+              <th style={{
+                padding: '16px 24px',
+                textAlign: 'left',
+                fontSize: '12px',
+                fontWeight: '600',
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+              }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -615,6 +650,28 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onCreateSale }) => {
                   color: '#6b7280',
                 }}>
                   {sale.items.map(item => item.productName).join(', ')}
+                </td>
+                <td style={{
+                  padding: '20px 24px',
+                  whiteSpace: 'nowrap',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                }}>
+                  {onDeleteSale && (
+                    <button
+                      onClick={() => handleDeleteSale(sale)}
+                      style={{
+                        ...buttonStyle,
+                        backgroundColor: '#dc2626',
+                        fontSize: '14px',
+                        padding: '6px 12px',
+                      }}
+                      onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#b91c1c'}
+                      onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#dc2626'}
+                    >
+                      🗑️ Delete
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

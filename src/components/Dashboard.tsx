@@ -1,4 +1,4 @@
-import type { Product } from '../types';
+import type { Product, Sale } from '../types';
 import { formatBDT } from '../utils/currency';
 
 const StatDisplay: React.FC<{ label: string; value: string | number; icon?: string; color?: string }> = ({ 
@@ -64,27 +64,45 @@ const StatDisplay: React.FC<{ label: string; value: string | number; icon?: stri
 
 interface DashboardProps {
   products: Product[];
+  sales: Sale[];
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ products }) => {
+const Dashboard: React.FC<DashboardProps> = ({ products, sales }) => {
   const totalProducts = products.length;
   const totalInventoryValue = products.reduce(
     (sum, product) => sum + product.purchasePrice * product.quantity,
     0
   );
-  const potentialProfit = products.reduce(
-    (sum, product) => sum + (product.sellingPrice - product.purchasePrice) * product.quantity,
-    0
-  );
 
-  // Calculate additional metrics
-  const totalRevenue = products.reduce(
-    (sum, product) => sum + product.sellingPrice * product.quantity,
-    0
-  );
+  // Monthly calculations (current month)
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  
+  const monthlySales = sales.filter(sale => {
+    const saleDate = new Date(sale.date);
+    return saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear;
+  });
 
-  // Get low stock items (less than 10 units)
-  const lowStockItems = products.filter(p => p.quantity < 10).length;
+  const monthlyRevenue = monthlySales.reduce((sum, sale) => sum + sale.totalRevenue, 0);
+  const monthlyProfit = monthlySales.reduce((sum, sale) => sum + sale.totalProfit, 0);
+
+  // Weekly calculations (current week)
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
+  startOfWeek.setHours(0, 0, 0, 0);
+  
+  const weeklySales = sales.filter(sale => {
+    const saleDate = new Date(sale.date);
+    return saleDate >= startOfWeek;
+  });
+
+  // Credit calculations
+  const totalCreditAmount = sales.reduce((sum, sale) => sum + sale.creditInfo.creditAmount, 0);
+
+  // Sales count
+  const monthlySalesCount = monthlySales.length;
+  const weeklySalesCount = weeklySales.length;
 
   return (
     <div style={{
@@ -149,44 +167,45 @@ const Dashboard: React.FC<DashboardProps> = ({ products }) => {
           color="#10b981"
         />
         <StatDisplay 
-          label="Potential Profit" 
-          value={formatBDT(potentialProfit)} 
+          label="Monthly Revenue" 
+          value={formatBDT(monthlyRevenue)} 
           icon="📊"
           color="#f59e0b"
         />
         <StatDisplay 
-          label="Potential Revenue" 
-          value={formatBDT(totalRevenue)} 
+          label="Monthly Profit" 
+          value={formatBDT(monthlyProfit)} 
           icon="💵"
           color="#8b5cf6"
         />
       </div>
 
-      {/* Quick Insights */}
-      {(lowStockItems > 0 || totalProducts === 0) && (
-        <div style={{
-          marginTop: '20px',
-          padding: '16px',
-          backgroundColor: lowStockItems > 0 ? '#fef2f2' : '#f0f9ff',
-          border: `1px solid ${lowStockItems > 0 ? '#fecaca' : '#bae6fd'}`,
-          borderRadius: '8px',
-        }}>
-          <div style={{ 
-            fontSize: '14px', 
-            fontWeight: '600', 
-            color: lowStockItems > 0 ? '#dc2626' : '#0ea5e9',
-            marginBottom: '4px',
-          }}>
-            {totalProducts === 0 ? '🚀 Getting Started' : '⚠️ Inventory Alert'}
-          </div>
-          <div style={{ fontSize: '14px', color: '#374151' }}>
-            {totalProducts === 0 
-              ? 'Add your first product to start tracking your auto parts inventory.'
-              : `${lowStockItems} item${lowStockItems !== 1 ? 's' : ''} running low on stock. Consider restocking soon.`
-            }
-          </div>
-        </div>
-      )}
+      {/* Additional Business Metrics */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+        gap: '20px',
+        marginTop: '24px',
+      }}>
+        <StatDisplay 
+          label="Outstanding Credit" 
+          value={formatBDT(totalCreditAmount)} 
+          icon="💳"
+          color="#dc2626"
+        />
+        <StatDisplay 
+          label={weeklySalesCount === 1 ? "This Week" : "This Week"} 
+          value={`${weeklySalesCount} sale${weeklySalesCount !== 1 ? 's' : ''}`}
+          icon="📈"
+          color="#059669"
+        />
+        <StatDisplay 
+          label={monthlySalesCount === 1 ? "This Month" : "This Month"} 
+          value={`${monthlySalesCount} sale${monthlySalesCount !== 1 ? 's' : ''}`}
+          icon="📅"
+          color="#7c3aed"
+        />
+      </div>
     </div>
   );
 };

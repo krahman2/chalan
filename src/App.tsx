@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import ProductTable from './components/ProductTable';
 import AddProductForm from './components/AddProductForm';
 import SalesHistory from './pages/SalesHistory';
+import InventoryAnalysis from './pages/InventoryAnalysis';
 import Dashboard from './components/Dashboard';
 import Modal from './components/Modal';
 import CreateSaleForm from './components/CreateSaleForm';
@@ -10,7 +11,7 @@ import { ProductService, SaleService } from './services/database';
 import type { Product, Sale, SaleItem, CreditInfo } from './types';
 
 function App() {
-  const [page, setPage] = useState('inventory');
+  const [page, setPage] = useState<'inventory' | 'sales' | 'analysis'>('inventory');
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
   const [isCreateSaleModalOpen, setIsCreateSaleModalOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
@@ -92,6 +93,16 @@ function App() {
     } catch (error) {
       console.error('Failed to update product:', error);
       alert('Failed to update product. Please try again.');
+    }
+  };
+
+  const deleteSale = async (id: string) => {
+    try {
+      await SaleService.deleteSale(id);
+      setSales(sales.filter((sale) => sale.id !== id));
+    } catch (error) {
+      console.error('Failed to delete sale:', error);
+      alert('Failed to delete sale. Please try again.');
     }
   };
 
@@ -233,9 +244,27 @@ function App() {
               >
                 📊 Sales History
               </button>
+              <button 
+                onClick={() => setPage('analysis')} 
+                style={navButtonStyle(page === 'analysis')}
+                onMouseEnter={(e) => {
+                  if (page !== 'analysis') {
+                    (e.target as HTMLButtonElement).style.backgroundColor = '#f0f9ff';
+                    (e.target as HTMLButtonElement).style.color = '#3b82f6';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (page !== 'analysis') {
+                    (e.target as HTMLButtonElement).style.backgroundColor = 'transparent';
+                    (e.target as HTMLButtonElement).style.color = '#6b7280';
+                  }
+                }}
+              >
+                🔍 Analysis
+              </button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              {page === 'inventory' && (
+              {(page === 'inventory' || page === 'analysis') && (
                 <button
                   onClick={openCreateSaleModal}
                   style={actionButtonStyle('#8b5cf6')}
@@ -277,15 +306,17 @@ function App() {
           </div>
         ) : page === 'inventory' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <Dashboard products={products} />
+            <Dashboard products={products} sales={sales} />
             <ProductTable
               products={products}
               onDeleteProduct={deleteProduct}
               onUpdateProduct={updateProduct}
             />
           </div>
+        ) : page === 'sales' ? (
+          <SalesHistory sales={sales} onCreateSale={openCreateSaleModal} onDeleteSale={deleteSale} />
         ) : (
-          <SalesHistory sales={sales} onCreateSale={openCreateSaleModal} />
+          <InventoryAnalysis products={products} />
         )}
       </main>
 
