@@ -9,7 +9,6 @@ interface SalesHistoryProps {
   sales: Sale[];
   standaloneCredits: StandaloneCredit[];
   payments: Payment[];
-  onCreateSale?: () => void;
   onDeleteSale?: (id: string) => void;
   onAddCredit: (credit: Omit<StandaloneCredit, 'id'>) => void;
   onAddPayment: (payment: Omit<Payment, 'id'>) => void;
@@ -19,7 +18,6 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({
   sales, 
   standaloneCredits, 
   payments, 
-  onCreateSale, 
   onDeleteSale, 
   onAddCredit, 
   onAddPayment 

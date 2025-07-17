@@ -340,7 +340,6 @@ function App() {
               sales={sales} 
               standaloneCredits={standaloneCredits}
               payments={payments}
-              onCreateSale={openCreateSaleModal} 
               onDeleteSale={deleteSale}
               onAddCredit={handleAddCredit}
               onAddPayment={handleAddPayment}
