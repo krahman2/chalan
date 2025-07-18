@@ -1,25 +1,36 @@
 import { useState, useMemo } from 'react';
-import type { Product, Sale, SaleItem, CreditInfo } from '../types';
+import type { Product, Sale, SaleItem, CreditInfo, StandaloneCredit, Payment } from '../types';
 import { formatBDT } from '../utils/currency';
+import { useAllBuyers } from '../hooks/useBuyers';
+import { getUnitProfit } from '../utils/productCalculations';
+import { roundToCurrency, addCurrency, currencyEquals, safeParseFloat } from '../utils/mathUtils';
 
 interface CreateSaleFormProps {
   products: Product[];
   sales: Sale[];
+  standaloneCredits: StandaloneCredit[];
+  payments: Payment[];
   onSave: (saleItems: SaleItem[], buyerName: string, creditInfo: CreditInfo) => void;
   onCancel: () => void;
 }
 
-const CreateSaleForm: React.FC<CreateSaleFormProps> = ({ products, sales, onSave, onCancel }) => {
+const CreateSaleForm: React.FC<CreateSaleFormProps> = ({ 
+  products, 
+  sales, 
+  standaloneCredits, 
+  payments, 
+  onSave, 
+  onCancel 
+}) => {
   const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [buyerName, setBuyerName] = useState('');
   const [cashAmount, setCashAmount] = useState('');
   const [creditAmount, setCreditAmount] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Get unique buyer names from existing sales for autocomplete
-  const existingBuyers = useMemo(() => {
-    return Array.from(new Set(sales.map(s => s.buyerName))).sort();
-  }, [sales]);
+  // Use universal buyer hook for consistent autocomplete
+  const existingBuyers = useAllBuyers(sales, standaloneCredits, payments);
 
   // Style definitions
   const inputStyle = {
@@ -70,7 +81,7 @@ const CreateSaleForm: React.FC<CreateSaleFormProps> = ({ products, sales, onSave
       productId: product.id,
       productName: product.name,
       quantity: 1,
-      profit: product.sellingPrice - product.purchasePrice,
+      profit: getUnitProfit(product), // Use standardized calculation
       sellingPrice: product.sellingPrice,
     }]);
     setSearchTerm('');
@@ -110,11 +121,13 @@ const CreateSaleForm: React.FC<CreateSaleFormProps> = ({ products, sales, onSave
   const totalProfit = saleItems.reduce((sum, item) => sum + item.profit * item.quantity, 0);
   const totalCost = totalRevenue - totalProfit;
 
-  const cashAmountNum = parseFloat(cashAmount) || 0;
-  const creditAmountNum = parseFloat(creditAmount) || 0;
-  const totalAmount = cashAmountNum + creditAmountNum;
+  const cashAmountNum = roundToCurrency(safeParseFloat(cashAmount));
+  const creditAmountNum = roundToCurrency(safeParseFloat(creditAmount));
+  const totalAmount = addCurrency(cashAmountNum, creditAmountNum);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (isSubmitting) return; // Prevent double submission
+    
     if (saleItems.length === 0) {
       alert('Please add at least one item to the sale');
       return;
@@ -123,18 +136,26 @@ const CreateSaleForm: React.FC<CreateSaleFormProps> = ({ products, sales, onSave
       alert('Please enter buyer name');
       return;
     }
-    if (Math.abs(totalAmount - totalRevenue) > 0.01) {
+    if (!currencyEquals(totalAmount, totalRevenue)) {
       alert(`Total payment (${formatBDT(totalAmount)}) must equal total revenue (${formatBDT(totalRevenue)})`);
       return;
     }
 
-    const creditInfo: CreditInfo = {
-      cashAmount: cashAmountNum,
-      creditAmount: creditAmountNum,
-      totalAmount: totalAmount,
-    };
+    setIsSubmitting(true); // Set loading state
 
-    onSave(saleItems, buyerName, creditInfo);
+    try {
+      const creditInfo: CreditInfo = {
+        cashAmount: cashAmountNum,
+        creditAmount: creditAmountNum,
+        totalAmount: totalAmount,
+      };
+
+      await onSave(saleItems, buyerName, creditInfo);
+    } catch (error) {
+      console.error('Failed to create sale:', error);
+    } finally {
+      setIsSubmitting(false); // Reset loading state
+    }
   };
 
   return (
@@ -330,7 +351,6 @@ const CreateSaleForm: React.FC<CreateSaleFormProps> = ({ products, sales, onSave
                 style={inputStyle}
                 placeholder="0.00"
                 step="0.01"
-                min="0"
                 onFocus={(e) => (e.target as HTMLInputElement).style.borderColor = '#3b82f6'}
                 onBlur={(e) => (e.target as HTMLInputElement).style.borderColor = '#d1d5db'}
               />
@@ -347,7 +367,6 @@ const CreateSaleForm: React.FC<CreateSaleFormProps> = ({ products, sales, onSave
                 style={inputStyle}
                 placeholder="0.00"
                 step="0.01"
-                min="0"
                 onFocus={(e) => (e.target as HTMLInputElement).style.borderColor = '#3b82f6'}
                 onBlur={(e) => (e.target as HTMLInputElement).style.borderColor = '#d1d5db'}
               />
@@ -370,11 +389,11 @@ const CreateSaleForm: React.FC<CreateSaleFormProps> = ({ products, sales, onSave
               <div style={{ color: '#16a34a' }}>
                 <strong>Total Profit:</strong> {formatBDT(totalProfit)}
               </div>
-              <div style={{ color: totalAmount === totalRevenue ? '#16a34a' : '#dc2626' }}>
+              <div style={{ color: currencyEquals(totalAmount, totalRevenue) ? '#16a34a' : '#dc2626' }}>
                 <strong>Total Payment:</strong> {formatBDT(totalAmount)}
               </div>
             </div>
-            {Math.abs(totalAmount - totalRevenue) > 0.01 && (
+            {!currencyEquals(totalAmount, totalRevenue) && (
               <div style={{ 
                 marginTop: '8px', 
                 padding: '8px', 
@@ -413,25 +432,25 @@ const CreateSaleForm: React.FC<CreateSaleFormProps> = ({ products, sales, onSave
         </button>
         <button
           onClick={handleSave}
-          disabled={saleItems.length === 0 || !buyerName.trim() || Math.abs(totalAmount - totalRevenue) > 0.01}
+          disabled={isSubmitting || saleItems.length === 0 || !buyerName.trim() || !currencyEquals(totalAmount, totalRevenue)}
           style={{
             ...buttonStyle,
-            backgroundColor: saleItems.length === 0 || !buyerName.trim() || Math.abs(totalAmount - totalRevenue) > 0.01 ? '#9ca3af' : '#10b981',
+            backgroundColor: isSubmitting || saleItems.length === 0 || !buyerName.trim() || !currencyEquals(totalAmount, totalRevenue) ? '#9ca3af' : '#10b981',
             color: 'white',
-            cursor: saleItems.length === 0 || !buyerName.trim() || Math.abs(totalAmount - totalRevenue) > 0.01 ? 'not-allowed' : 'pointer',
+            cursor: isSubmitting || saleItems.length === 0 || !buyerName.trim() || !currencyEquals(totalAmount, totalRevenue) ? 'not-allowed' : 'pointer',
           }}
           onMouseEnter={(e) => {
-            if (saleItems.length > 0 && buyerName.trim() && Math.abs(totalAmount - totalRevenue) <= 0.01) {
+            if (!isSubmitting && saleItems.length > 0 && buyerName.trim() && currencyEquals(totalAmount, totalRevenue)) {
               (e.target as HTMLButtonElement).style.backgroundColor = '#059669';
             }
           }}
           onMouseLeave={(e) => {
-            if (saleItems.length > 0 && buyerName.trim() && Math.abs(totalAmount - totalRevenue) <= 0.01) {
+            if (!isSubmitting && saleItems.length > 0 && buyerName.trim() && currencyEquals(totalAmount, totalRevenue)) {
               (e.target as HTMLButtonElement).style.backgroundColor = '#10b981';
             }
           }}
         >
-          💰 Create Sale
+          {isSubmitting ? '💰 Creating...' : '💰 Create Sale'}
         </button>
       </div>
     </div>

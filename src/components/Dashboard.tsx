@@ -1,5 +1,6 @@
 import type { Product, Sale } from '../types';
 import { formatBDT } from '../utils/currency';
+import { getProductInventoryValue } from '../utils/productCalculations';
 
 const StatDisplay: React.FC<{ label: string; value: string | number; icon?: string; color?: string }> = ({ 
   label, 
@@ -70,7 +71,7 @@ interface DashboardProps {
 const Dashboard: React.FC<DashboardProps> = ({ products, sales }) => {
   const totalProducts = products.length;
   const totalInventoryValue = products.reduce(
-    (sum, product) => sum + product.purchasePrice * product.quantity,
+    (sum, product) => sum + getProductInventoryValue(product),
     0
   );
 

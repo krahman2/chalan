@@ -3,6 +3,7 @@ import EditProductForm from './EditProductForm';
 import SellProductForm from './SellProductForm';
 import type { Product, ProductCategory, ProductBrand, Country } from '../types';
 import { formatBDT } from '../utils/currency';
+import { getProductInventoryValue, getUnitProfit } from '../utils/productCalculations';
 
 interface ProductTableProps {
   products: Product[];
@@ -73,8 +74,8 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onDeleteProduct, 
       let bValue: any;
 
       if (sortField === 'profit') {
-        aValue = (a.sellingPrice - a.purchasePrice) * a.quantity;
-        bValue = (b.sellingPrice - b.purchasePrice) * b.quantity;
+        aValue = getUnitProfit(a) * a.quantity;
+        bValue = getUnitProfit(b) * b.quantity;
       } else {
         aValue = a[sortField as keyof Product];
         bValue = b[sortField as keyof Product];
@@ -507,7 +508,7 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onDeleteProduct, 
                     fontWeight: '600',
                     color: '#059669',
                   }}>
-                    {formatBDT(Number(product.purchasePrice) * Number(product.quantity))}
+                    {formatBDT(getProductInventoryValue(product))}
                   </td>
                   <td style={{
                     padding: '20px 24px',

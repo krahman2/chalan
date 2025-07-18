@@ -4,6 +4,8 @@ import { formatBDT } from '../utils/currency';
 import Modal from '../components/Modal';
 import AddCreditForm from '../components/AddCreditForm';
 import AddPaymentForm from '../components/AddPaymentForm';
+import { useAllBuyers, useOutstandingCredit } from '../hooks/useBuyers';
+import { PaymentService, CreditService } from '../services/database';
 
 interface SalesHistoryProps {
   sales: Sale[];
@@ -12,6 +14,8 @@ interface SalesHistoryProps {
   onDeleteSale?: (id: string) => void;
   onAddCredit: (credit: Omit<StandaloneCredit, 'id'>) => void;
   onAddPayment: (payment: Omit<Payment, 'id'>) => void;
+  onDeletePayment?: (paymentId: string) => void;
+  onDeleteCredit?: (creditId: string) => void;
 }
 
 const SalesHistory: React.FC<SalesHistoryProps> = ({ 
@@ -20,7 +24,9 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({
   payments, 
   onDeleteSale, 
   onAddCredit, 
-  onAddPayment 
+  onAddPayment,
+  onDeletePayment,
+  onDeleteCredit
 }) => {
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
   const [showCreditView, setShowCreditView] = useState(false);
@@ -45,6 +51,38 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({
   const handleAddPaymentLocal = (payment: Omit<Payment, 'id'>) => {
     onAddPayment(payment);
     setIsAddPaymentModalOpen(false);
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    if (window.confirm('Are you sure you want to delete this payment? This action cannot be undone.')) {
+      if (onDeletePayment) {
+        onDeletePayment(paymentId);
+      } else {
+        try {
+          await PaymentService.deletePayment(paymentId);
+          window.location.reload();
+        } catch (error) {
+          console.error('Failed to delete payment:', error);
+          alert('Failed to delete payment. Please try again.');
+        }
+      }
+    }
+  };
+
+  const handleDeleteCredit = async (creditId: string) => {
+    if (window.confirm('Are you sure you want to delete this credit? This action cannot be undone.')) {
+      if (onDeleteCredit) {
+        onDeleteCredit(creditId);
+      } else {
+        try {
+          await CreditService.deleteStandaloneCredit(creditId);
+          window.location.reload();
+        } catch (error) {
+          console.error('Failed to delete credit:', error);
+          alert('Failed to delete credit. Please try again.');
+        }
+      }
+    }
   };
 
   const toggleDetails = (saleId: string) => {
@@ -134,9 +172,8 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({
     }
   };
 
-  const uniqueBuyers = useMemo(() => {
-    return Array.from(new Set(sales.map(s => s.buyerName))).sort();
-  }, [sales]);
+  // Use universal buyer hook for consistent buyer lists
+  const uniqueBuyers = useAllBuyers(sales, standaloneCredits, payments);
 
   const filteredSales = useMemo(() => {
     return sales.filter(sale => {
@@ -157,32 +194,8 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({
     });
   }, [sales, buyerFilter, searchTerm, timeFilter, selectedYear, selectedMonth]);
 
-  // Calculate net outstanding credit for each buyer
-  const calculateOutstandingCredit = useMemo(() => {
-    const creditMap = new Map<string, number>();
-    
-    // Add credit from sales
-    sales.forEach(sale => {
-      if (sale.creditInfo.creditAmount > 0) {
-        const current = creditMap.get(sale.buyerName) || 0;
-        creditMap.set(sale.buyerName, current + sale.creditInfo.creditAmount);
-      }
-    });
-    
-    // Add standalone credits
-    standaloneCredits.forEach(credit => {
-      const current = creditMap.get(credit.buyerName) || 0;
-      creditMap.set(credit.buyerName, current + credit.creditAmount);
-    });
-    
-    // Subtract payments
-    payments.forEach(payment => {
-      const current = creditMap.get(payment.buyerName) || 0;
-      creditMap.set(payment.buyerName, Math.max(0, current - payment.amount));
-    });
-    
-    return creditMap;
-  }, [sales, standaloneCredits, payments]);
+  // Use consistent outstanding credit calculation
+  const calculateOutstandingCredit = useOutstandingCredit(sales, standaloneCredits, payments);
 
   // Create combined credit transactions for display
   const allCreditTransactions = useMemo(() => {
@@ -850,21 +863,53 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({
                       fontSize: '16px',
                       fontWeight: '600',
                     }}>
-                      {onDeleteSale && transaction.type === 'sale' && (
-                        <button
-                          onClick={() => handleDeleteSale(transaction.originalData as Sale)}
-                          style={{
-                            ...buttonStyle,
-                            backgroundColor: '#dc2626',
-                            fontSize: '14px',
-                            padding: '6px 12px',
-                          }}
-                          onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#b91c1c'}
-                          onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#dc2626'}
-                        >
-                          🗑️ Delete
-                        </button>
-                      )}
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        {onDeleteSale && transaction.type === 'sale' && (
+                          <button
+                            onClick={() => handleDeleteSale(transaction.originalData as Sale)}
+                            style={{
+                              ...buttonStyle,
+                              backgroundColor: '#dc2626',
+                              fontSize: '14px',
+                              padding: '6px 12px',
+                            }}
+                            onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#b91c1c'}
+                            onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#dc2626'}
+                          >
+                            🗑️ Delete
+                          </button>
+                        )}
+                        {transaction.type === 'payment' && (
+                          <button
+                            onClick={() => handleDeletePayment(transaction.id)}
+                            style={{
+                              ...buttonStyle,
+                              backgroundColor: '#dc2626',
+                              fontSize: '14px',
+                              padding: '6px 12px',
+                            }}
+                            onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#b91c1c'}
+                            onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#dc2626'}
+                          >
+                            🗑️ Delete
+                          </button>
+                        )}
+                        {transaction.type === 'standalone' && (
+                          <button
+                            onClick={() => handleDeleteCredit(transaction.id)}
+                            style={{
+                              ...buttonStyle,
+                              backgroundColor: '#dc2626',
+                              fontSize: '14px',
+                              padding: '6px 12px',
+                            }}
+                            onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#b91c1c'}
+                            onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#dc2626'}
+                          >
+                            🗑️ Delete
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -1257,6 +1302,8 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({
       >
         <AddCreditForm
           sales={sales}
+          standaloneCredits={standaloneCredits}
+          payments={payments}
           onAddCredit={handleAddCreditLocal}
           onCancel={() => setIsAddCreditModalOpen(false)}
         />
@@ -1271,6 +1318,7 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({
         <AddPaymentForm
           sales={sales}
           standaloneCredits={standaloneCredits}
+          payments={payments}
           onAddPayment={handleAddPaymentLocal}
           onCancel={() => setIsAddPaymentModalOpen(false)}
         />

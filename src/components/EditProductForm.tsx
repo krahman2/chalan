@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Product, ProductCategory, ProductBrand } from '../types';
 import { formatBDT } from '../utils/currency';
+import { roundToCurrency, addCurrency, multiplyCurrency, safeParseFloat, safeParseInt } from '../utils/mathUtils';
 
 interface EditProductFormProps {
   product: Product;
@@ -47,12 +48,12 @@ const EditProductForm: React.FC<EditProductFormProps> = ({ product, onSave, onCa
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Calculate new final purchase price including duty
+    // Calculate new final purchase price including duty with precise math
     const basePrice = originalAmount && exchangeRate 
-      ? originalAmount * exchangeRate 
-      : originalAmount || purchasePrice;
+      ? multiplyCurrency(originalAmount, exchangeRate)
+      : roundToCurrency(originalAmount || purchasePrice);
     
-    const newFinalPrice = basePrice + dutyPerUnit;
+    const newFinalPrice = addCurrency(basePrice, dutyPerUnit);
     
     // Update the pricing structure with new original amount, duty and exchange rate
     const updatedPricing = product.pricing ? {
@@ -79,7 +80,10 @@ const EditProductForm: React.FC<EditProductFormProps> = ({ product, onSave, onCa
       purchasePrice: newFinalPrice, // Update legacy field to match calculated price
       sellingPrice: sellingPrice,
       quantity: quantity,
-      pricing: updatedPricing,
+      pricing: {
+        ...updatedPricing,
+        finalPurchasePrice: newFinalPrice, // Ensure pricing structure is also updated
+      },
     });
   };
 
@@ -141,7 +145,7 @@ const EditProductForm: React.FC<EditProductFormProps> = ({ product, onSave, onCa
         <input
           type="number"
           value={originalAmount}
-          onChange={(e) => setOriginalAmount(Number(e.target.value))}
+          onChange={(e) => setOriginalAmount(safeParseFloat(e.target.value))}
           style={inputStyle}
           step="0.01"
           min="0"
@@ -158,7 +162,7 @@ const EditProductForm: React.FC<EditProductFormProps> = ({ product, onSave, onCa
         <input
           type="number"
           value={exchangeRate}
-          onChange={(e) => setExchangeRate(Number(e.target.value))}
+          onChange={(e) => setExchangeRate(safeParseFloat(e.target.value))}
           style={inputStyle}
           step="0.01"
           min="0.01"
@@ -170,7 +174,7 @@ const EditProductForm: React.FC<EditProductFormProps> = ({ product, onSave, onCa
         <input
           type="number"
           value={dutyPerUnit}
-          onChange={(e) => setDutyPerUnit(Number(e.target.value))}
+          onChange={(e) => setDutyPerUnit(safeParseFloat(e.target.value))}
           style={inputStyle}
           step="0.01"
           min="0"
@@ -181,7 +185,7 @@ const EditProductForm: React.FC<EditProductFormProps> = ({ product, onSave, onCa
         <input
           type="number"
           value={purchasePrice}
-          onChange={(e) => setPurchasePrice(Number(e.target.value))}
+          onChange={(e) => setPurchasePrice(safeParseFloat(e.target.value))}
           style={inputStyle}
           step="0.01"
           min="0"
@@ -192,7 +196,7 @@ const EditProductForm: React.FC<EditProductFormProps> = ({ product, onSave, onCa
         <input
           type="number"
           value={sellingPrice}
-          onChange={(e) => setSellingPrice(Number(e.target.value))}
+          onChange={(e) => setSellingPrice(safeParseFloat(e.target.value))}
           style={inputStyle}
           step="0.01"
           min="0"
@@ -203,7 +207,7 @@ const EditProductForm: React.FC<EditProductFormProps> = ({ product, onSave, onCa
         <input
           type="number"
           value={quantity}
-          onChange={(e) => setQuantity(Number(e.target.value))}
+          onChange={(e) => setQuantity(safeParseInt(e.target.value))}
           style={inputStyle}
           min="0"
           required
@@ -213,9 +217,10 @@ const EditProductForm: React.FC<EditProductFormProps> = ({ product, onSave, onCa
         <div style={{ fontSize: '16px', fontWeight: '600', color: '#059669' }}>
           {formatBDT((() => {
             const basePrice = originalAmount && exchangeRate 
-              ? originalAmount * exchangeRate 
-              : originalAmount || purchasePrice;
-            return (basePrice + dutyPerUnit) * quantity;
+              ? multiplyCurrency(originalAmount, exchangeRate)
+              : roundToCurrency(originalAmount || purchasePrice);
+            const finalPrice = addCurrency(basePrice, dutyPerUnit);
+            return multiplyCurrency(finalPrice, quantity);
           })())}
         </div>
       </td>

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import type { Product, ProductCategory, ProductBrand, Country } from '../types';
 import { formatBDT } from '../utils/currency';
+import { getProductInventoryValue } from '../utils/productCalculations';
 
 interface InventoryAnalysisProps {
   products: Product[];
@@ -77,7 +78,7 @@ const InventoryAnalysis: React.FC<InventoryAnalysisProps> = ({ products }) => {
   // Calculate totals
   const totals = useMemo(() => {
     const totalQuantity = filteredProducts.reduce((sum, product) => sum + product.quantity, 0);
-    const totalCost = filteredProducts.reduce((sum, product) => sum + (product.purchasePrice * product.quantity), 0);
+    const totalCost = filteredProducts.reduce((sum, product) => sum + getProductInventoryValue(product), 0);
     const totalValue = filteredProducts.reduce((sum, product) => sum + (product.sellingPrice * product.quantity), 0);
     const totalProfit = totalValue - totalCost;
     const productCount = filteredProducts.length;

@@ -1,5 +1,7 @@
 import { supabase } from '../lib/supabase'
 import type { Product, Sale, StandaloneCredit, Payment } from '../types'
+import { generateProductId, generateSaleId, generateCreditId, generatePaymentId } from '../utils/idGenerator'
+import { safeParseFloat, safeParseInt } from '../utils/mathUtils'
 
 // Helper functions to convert between camelCase and snake_case
 const convertProductFromDb = (dbProduct: any): Product => ({
@@ -9,9 +11,9 @@ const convertProductFromDb = (dbProduct: any): Product => ({
   category: dbProduct.category,
   brand: dbProduct.brand,
   country: dbProduct.country,
-  purchasePrice: Number(dbProduct.purchase_price),
-  sellingPrice: Number(dbProduct.selling_price),
-  quantity: dbProduct.quantity,
+  purchasePrice: safeParseFloat(dbProduct.purchase_price), // Safe precision conversion
+  sellingPrice: safeParseFloat(dbProduct.selling_price), // Safe precision conversion
+  quantity: safeParseInt(dbProduct.quantity), // Safe integer conversion
   pricing: dbProduct.pricing ? dbProduct.pricing : undefined,
 });
 
@@ -32,14 +34,14 @@ const convertSaleFromDb = (dbSale: any): Sale => ({
   id: dbSale.id,
   date: dbSale.date,
   buyerName: dbSale.buyer_name,
-  totalProfit: Number(dbSale.total_profit),
-  totalRevenue: Number(dbSale.total_revenue),
+  totalProfit: safeParseFloat(dbSale.total_profit), // Safe precision conversion
+  totalRevenue: safeParseFloat(dbSale.total_revenue), // Safe precision conversion
   items: dbSale.items,
   creditInfo: dbSale.credit_info,
 });
 
 const convertSaleToDb = (sale: Omit<Sale, 'id'> & { id?: string }) => ({
-  id: sale.id || Date.now().toString(),
+  id: sale.id || generateSaleId(), // Use collision-safe ID generation
   date: sale.date,
   buyer_name: sale.buyerName,
   total_profit: sale.totalProfit,
@@ -51,14 +53,14 @@ const convertSaleToDb = (sale: Omit<Sale, 'id'> & { id?: string }) => ({
 const convertStandaloneCreditFromDb = (dbCredit: any): StandaloneCredit => ({
   id: dbCredit.id,
   buyerName: dbCredit.buyer_name,
-  creditAmount: Number(dbCredit.credit_amount),
+  creditAmount: safeParseFloat(dbCredit.credit_amount), // Safe precision conversion
   description: dbCredit.description,
   date: dbCredit.date,
   isStandalone: dbCredit.is_standalone,
 });
 
 const convertStandaloneCreditToDb = (credit: Omit<StandaloneCredit, 'id'> & { id?: string }) => ({
-  id: credit.id || Date.now().toString(),
+  id: credit.id || generateCreditId(), // Use collision-safe ID generation
   buyer_name: credit.buyerName,
   credit_amount: credit.creditAmount,
   description: credit.description,
@@ -69,7 +71,7 @@ const convertStandaloneCreditToDb = (credit: Omit<StandaloneCredit, 'id'> & { id
 const convertPaymentFromDb = (dbPayment: any): Payment => ({
   id: dbPayment.id,
   buyerName: dbPayment.buyer_name,
-  amount: Number(dbPayment.amount),
+  amount: safeParseFloat(dbPayment.amount), // Safe precision conversion
   date: dbPayment.date,
   description: dbPayment.description,
   relatedSaleId: dbPayment.related_sale_id,
@@ -77,7 +79,7 @@ const convertPaymentFromDb = (dbPayment: any): Payment => ({
 });
 
 const convertPaymentToDb = (payment: Omit<Payment, 'id'> & { id?: string }) => ({
-  id: payment.id || Date.now().toString(),
+  id: payment.id || generatePaymentId(), // Use collision-safe ID generation
   buyer_name: payment.buyerName,
   amount: payment.amount,
   date: payment.date,
@@ -109,7 +111,7 @@ export class ProductService {
     try {
       const newProduct: Product = {
         ...product,
-        id: Date.now().toString(),
+        id: generateProductId(), // Use collision-safe ID generation
       };
       
       const dbProduct = convertProductToDb(newProduct);
@@ -135,7 +137,7 @@ export class ProductService {
       const products = await this.getAllProducts()
       const newProduct: Product = {
         ...product,
-        id: Date.now().toString(),
+        id: generateProductId(), // Use collision-safe ID generation
       }
       const updatedProducts = [...products, newProduct]
       localStorage.setItem('products', JSON.stringify(updatedProducts))
@@ -220,7 +222,7 @@ export class SaleService {
     try {
       const newSale = {
         ...sale,
-        id: Date.now().toString(),
+        id: generateSaleId(), // Use collision-safe ID generation
       }
 
       const dbSale = convertSaleToDb(newSale);
@@ -246,8 +248,8 @@ export class SaleService {
       const sales = await this.getAllSales()
       const newSale: Sale = {
         ...sale,
-        id: Date.now().toString(),
-        date: new Date().toISOString(),
+        id: generateSaleId(), // Use collision-safe ID generation
+        date: sale.date || new Date().toISOString(), // Preserve original date if available
       }
       const updatedSales = [newSale, ...sales]
       localStorage.setItem('sales', JSON.stringify(updatedSales))
@@ -302,6 +304,32 @@ export class SaleService {
             .upsert(dbSale, { onConflict: 'id' })
         }
       }
+
+      // Sync standalone credits from localStorage to database
+      const localCredits = localStorage.getItem('standaloneCredits')
+      if (localCredits) {
+        const credits: StandaloneCredit[] = JSON.parse(localCredits)
+        for (const credit of credits) {
+          const dbCredit = convertStandaloneCreditToDb(credit);
+          await supabase
+            .from('standalone_credits')
+            .upsert(dbCredit, { onConflict: 'id' })
+        }
+      }
+
+      // Sync payments from localStorage to database
+      const localPayments = localStorage.getItem('payments')
+      if (localPayments) {
+        const payments: Payment[] = JSON.parse(localPayments)
+        for (const payment of payments) {
+          const dbPayment = convertPaymentToDb(payment);
+          await supabase
+            .from('payments')
+            .upsert(dbPayment, { onConflict: 'id' })
+        }
+      }
+
+      console.log('Successfully synced all data to database')
     } catch (error) {
       console.warn('Failed to sync data to database:', error)
     }

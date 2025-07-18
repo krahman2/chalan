@@ -9,6 +9,11 @@ import CreateSaleForm from './components/CreateSaleForm';
 
 import { ProductService, SaleService, CreditService, PaymentService } from './services/database';
 import type { Product, Sale, SaleItem, CreditInfo, StandaloneCredit, Payment } from './types';
+import { useDataConsistency } from './hooks/useDataConsistency';
+import { roundToCurrency, multiplyCurrency, ensureNonNegative } from './utils/mathUtils';
+import { validateProduct, validateSale, validateStandaloneCredit, validatePayment } from './utils/dataValidation';
+import { useOutstandingCredit } from './hooks/useBuyers';
+import ImportExportButtons from './components/ImportExportButtons';
 
 function App() {
   const [page, setPage] = useState<'inventory' | 'sales' | 'analysis'>('inventory');
@@ -20,29 +25,38 @@ function App() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Data consistency monitoring (in development)
+  const consistencyReport = useDataConsistency(sales, standaloneCredits, payments);
+  const outstandingCredit = useOutstandingCredit(sales, standaloneCredits, payments);
+
+  // Log consistency issues in development
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development' && !consistencyReport.isConsistent) {
+      console.warn('Data consistency issues detected:', consistencyReport);
+    }
+  }, [consistencyReport]);
+
+
+
   // Load initial data from database
   useEffect(() => {
     const loadInitialData = async () => {
       try {
         setIsLoading(true);
         
-        // Load products
+        // CRITICAL: Sync localStorage to database FIRST to prevent race conditions
+        await SaleService.syncToDatabase();
+        
+        // Then load fresh data from database
         const loadedProducts = await ProductService.getAllProducts();
-        setProducts(loadedProducts);
-        
-        // Load sales
         const loadedSales = await SaleService.getAllSales();
-        setSales(loadedSales);
-        
-        // Load credits and payments from database
         const loadedCredits = await CreditService.getAllStandaloneCredits();
         const loadedPayments = await PaymentService.getAllPayments();
         
+        setProducts(loadedProducts);
+        setSales(loadedSales);
         setStandaloneCredits(loadedCredits);
         setPayments(loadedPayments);
-        
-        // Sync any existing localStorage data to database
-        await SaleService.syncToDatabase();
         
       } catch (error) {
         console.error('Failed to load initial data:', error);
@@ -66,6 +80,13 @@ function App() {
 
   const addProduct = async (product: Omit<Product, 'id'>) => {
     try {
+      // Validate product before saving
+      const validation = validateProduct(product);
+      if (!validation.valid) {
+        alert('Product validation failed:\n' + validation.errors.join('\n'));
+        return;
+      }
+
       const newProduct = await ProductService.createProduct(product);
       setProducts([...products, newProduct]);
       setIsAddProductModalOpen(false);
@@ -111,8 +132,15 @@ function App() {
 
   const recordSale = async (saleItems: SaleItem[], buyerName: string, creditInfo: CreditInfo) => {
     try {
-      const totalRevenue = saleItems.reduce((sum, item) => sum + item.sellingPrice * item.quantity, 0);
-      const totalProfit = saleItems.reduce((sum, item) => sum + item.profit * item.quantity, 0);
+      // VALIDATION: Comprehensive sale validation
+      const validation = validateSale(saleItems, buyerName, creditInfo, products);
+      if (!validation.valid) {
+        alert('Sale validation failed:\n' + validation.errors.join('\n'));
+        return;
+      }
+
+      const totalRevenue = roundToCurrency(saleItems.reduce((sum, item) => sum + multiplyCurrency(item.sellingPrice, item.quantity), 0));
+      const totalProfit = roundToCurrency(saleItems.reduce((sum, item) => sum + multiplyCurrency(item.profit, item.quantity), 0));
 
       const saleData = {
         date: new Date().toISOString(),
@@ -131,20 +159,27 @@ function App() {
       // Update sales state
       setSales(prev => [newSale, ...prev]);
 
-      // Update product quantities in database and local state
-      for (const item of saleItems) {
-        const product = products.find(p => p.id === item.productId);
-        if (product) {
-          const updatedProduct = {
+      // FIXED: Update product quantities atomically to prevent race conditions
+      const updatedProducts = products.map(product => {
+        const saleItem = saleItems.find(item => item.productId === product.id);
+        if (saleItem) {
+          return {
             ...product,
-            quantity: product.quantity - item.quantity
+            quantity: ensureNonNegative(product.quantity - saleItem.quantity) // Prevent negative quantities with proper math
           };
+        }
+        return product;
+      });
+
+      // Update all products in database
+      for (const item of saleItems) {
+        const updatedProduct = updatedProducts.find(p => p.id === item.productId);
+        if (updatedProduct) {
           await ProductService.updateProduct(updatedProduct);
         }
       }
       
-      // Refresh products from database to ensure consistency
-      const updatedProducts = await ProductService.getAllProducts();
+      // Update local state with corrected quantities
       setProducts(updatedProducts);
 
       setIsCreateSaleModalOpen(false);
@@ -165,6 +200,13 @@ function App() {
   // Credit and payment handlers
   const handleAddCredit = async (credit: Omit<StandaloneCredit, 'id'>) => {
     try {
+      // Validate credit before saving
+      const validation = validateStandaloneCredit(credit);
+      if (!validation.valid) {
+        alert('Credit validation failed:\n' + validation.errors.join('\n'));
+        return;
+      }
+
       const newCredit = await CreditService.createStandaloneCredit(credit);
       setStandaloneCredits(prev => [newCredit, ...prev]);
     } catch (error) {
@@ -175,11 +217,83 @@ function App() {
 
   const handleAddPayment = async (payment: Omit<Payment, 'id'>) => {
     try {
+      // CRITICAL: Validate payment before saving
+      const availableCredit = outstandingCredit.get(payment.buyerName) || 0;
+      const validation = validatePayment(payment, availableCredit);
+      
+      if (!validation.valid) {
+        alert('Payment validation failed:\n' + validation.errors.join('\n'));
+        return;
+      }
+
       const newPayment = await PaymentService.createPayment(payment);
       setPayments(prev => [newPayment, ...prev]);
     } catch (error) {
       console.error('Failed to add payment:', error);
       alert('Failed to add payment. Please try again.');
+    }
+  };
+
+  // Bulk import products from CSV
+  const handleImportProducts = async (importedProducts: Product[]) => {
+    try {
+      // Validate all products before importing
+      const validationErrors: string[] = [];
+      
+      importedProducts.forEach((product, index) => {
+        const validation = validateProduct(product);
+        if (!validation.valid) {
+          validationErrors.push(`Product ${index + 1} (${product.name}): ${validation.errors.join(', ')}`);
+        }
+      });
+      
+      if (validationErrors.length > 0) {
+        alert('Import validation failed:\n' + validationErrors.join('\n'));
+        return;
+      }
+      
+      // Import products one by one to ensure database consistency
+      const successfulImports: Product[] = [];
+      
+      for (const product of importedProducts) {
+        try {
+          const newProduct = await ProductService.createProduct(product);
+          successfulImports.push(newProduct);
+        } catch (error) {
+          console.error(`Failed to import product ${product.name}:`, error);
+        }
+      }
+      
+      // Update local state with new products
+      setProducts(prev => [...successfulImports, ...prev]);
+      
+      if (successfulImports.length !== importedProducts.length) {
+        alert(`Imported ${successfulImports.length} out of ${importedProducts.length} products. Some failed to import.`);
+      }
+      
+    } catch (error) {
+      console.error('Failed to import products:', error);
+      alert('Failed to import products. Please try again.');
+    }
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    try {
+      await PaymentService.deletePayment(paymentId);
+      setPayments(prev => prev.filter(p => p.id !== paymentId));
+    } catch (error) {
+      console.error('Failed to delete payment:', error);
+      alert('Failed to delete payment. Please try again.');
+    }
+  };
+
+  const handleDeleteCredit = async (creditId: string) => {
+    try {
+      await CreditService.deleteStandaloneCredit(creditId);
+      setStandaloneCredits(prev => prev.filter(c => c.id !== creditId));
+    } catch (error) {
+      console.error('Failed to delete credit:', error);
+      alert('Failed to delete credit. Please try again.');
     }
   };
 
@@ -329,6 +443,30 @@ function App() {
         ) : page === 'inventory' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <Dashboard products={products} sales={sales} />
+            
+            {/* Import/Export Controls */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px 0',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <h2 style={{
+                fontSize: '24px',
+                fontWeight: '700',
+                color: '#111827',
+                margin: 0
+              }}>
+                Product Inventory
+              </h2>
+              
+              <ImportExportButtons 
+                products={products}
+                onImportProducts={handleImportProducts}
+              />
+            </div>
+            
             <ProductTable
               products={products}
               onDeleteProduct={deleteProduct}
@@ -343,6 +481,8 @@ function App() {
               onDeleteSale={deleteSale}
               onAddCredit={handleAddCredit}
               onAddPayment={handleAddPayment}
+              onDeletePayment={handleDeletePayment}
+              onDeleteCredit={handleDeleteCredit}
             />
         ) : (
           <InventoryAnalysis products={products} />
@@ -365,6 +505,8 @@ function App() {
         <CreateSaleForm
           products={products}
           sales={sales}
+          standaloneCredits={standaloneCredits}
+          payments={payments}
           onSave={recordSale}
           onCancel={() => setIsCreateSaleModalOpen(false)}
         />

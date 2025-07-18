@@ -1,10 +1,13 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import type { Payment, Sale, StandaloneCredit } from '../types';
 import { formatBDT } from '../utils/currency';
+import { useBuyersWithCredit } from '../hooks/useBuyers';
+import { safeParseFloat } from '../utils/mathUtils';
 
 interface AddPaymentFormProps {
   sales: Sale[];
   standaloneCredits: StandaloneCredit[];
+  payments: Payment[];
   onAddPayment: (payment: Omit<Payment, 'id'>) => void;
   onCancel: () => void;
 }
@@ -12,6 +15,7 @@ interface AddPaymentFormProps {
 const AddPaymentForm: React.FC<AddPaymentFormProps> = ({ 
   sales, 
   standaloneCredits, 
+  payments,
   onAddPayment, 
   onCancel 
 }) => {
@@ -19,40 +23,21 @@ const AddPaymentForm: React.FC<AddPaymentFormProps> = ({
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
 
-  // Get buyers with outstanding credit amounts
-  const buyersWithCredit = useMemo(() => {
-    const creditSummary = new Map<string, number>();
-    
-    // Add credit from sales
-    sales.forEach(sale => {
-      if (sale.creditInfo.creditAmount > 0) {
-        const current = creditSummary.get(sale.buyerName) || 0;
-        creditSummary.set(sale.buyerName, current + sale.creditInfo.creditAmount);
-      }
-    });
-    
-    // Add standalone credits
-    standaloneCredits.forEach(credit => {
-      const current = creditSummary.get(credit.buyerName) || 0;
-      creditSummary.set(credit.buyerName, current + credit.creditAmount);
-    });
-    
-    return Array.from(creditSummary.entries())
-      .map(([name, amount]) => ({ name, amount }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [sales, standaloneCredits]);
+  // Get buyers with outstanding credit amounts using the consistent hook
+  const buyersWithCredit = useBuyersWithCredit(sales, standaloneCredits, payments);
 
   const selectedBuyerCredit = buyersWithCredit.find(b => b.name === buyerName);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!buyerName || !amount || parseFloat(amount) <= 0) {
+    const paymentAmount = safeParseFloat(amount);
+    
+    if (!buyerName || !amount || paymentAmount <= 0) {
       alert('Please fill in all required fields with valid values.');
       return;
     }
 
-    const paymentAmount = parseFloat(amount);
     const availableCredit = selectedBuyerCredit?.amount || 0;
 
     if (paymentAmount > availableCredit) {

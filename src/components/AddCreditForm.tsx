@@ -1,33 +1,43 @@
-import { useState, useMemo } from 'react';
-import type { StandaloneCredit, Sale } from '../types';
+import { useState } from 'react';
+import type { StandaloneCredit, Sale, Payment } from '../types';
+import { useAllBuyers } from '../hooks/useBuyers';
+import { safeParseFloat } from '../utils/mathUtils';
 
 interface AddCreditFormProps {
   sales: Sale[];
+  standaloneCredits: StandaloneCredit[];
+  payments: Payment[];
   onAddCredit: (credit: Omit<StandaloneCredit, 'id'>) => void;
   onCancel: () => void;
 }
 
-const AddCreditForm: React.FC<AddCreditFormProps> = ({ sales, onAddCredit, onCancel }) => {
+const AddCreditForm: React.FC<AddCreditFormProps> = ({ 
+  sales, 
+  standaloneCredits, 
+  payments, 
+  onAddCredit, 
+  onCancel 
+}) => {
   const [buyerName, setBuyerName] = useState('');
   const [creditAmount, setCreditAmount] = useState('');
   const [description, setDescription] = useState('');
 
-  // Get unique buyer names from existing sales
-  const existingBuyers = useMemo(() => {
-    return Array.from(new Set(sales.map(s => s.buyerName))).sort();
-  }, [sales]);
+  // Use universal buyer hook for consistent buyer suggestions
+  const existingBuyers = useAllBuyers(sales, standaloneCredits, payments);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!buyerName || !creditAmount || parseFloat(creditAmount) <= 0) {
+    const creditAmountNum = safeParseFloat(creditAmount);
+    
+    if (!buyerName || !creditAmount || creditAmountNum <= 0) {
       alert('Please fill in all required fields with valid values.');
       return;
     }
 
     onAddCredit({
       buyerName,
-      creditAmount: parseFloat(creditAmount),
+      creditAmount: creditAmountNum,
       description: description || `Outstanding credit for ${buyerName}`,
       date: new Date().toISOString(),
       isStandalone: true,
