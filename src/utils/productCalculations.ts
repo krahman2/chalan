@@ -1,5 +1,5 @@
 import type { Product } from '../types';
-import { roundToCurrency, subtractCurrency, multiplyCurrency, ensureNonNegative } from './mathUtils';
+import { roundToCurrency, subtractCurrency, multiplyCurrency } from './mathUtils';
 
 /**
  * Get the actual purchase price of a product, preferring the detailed pricing structure

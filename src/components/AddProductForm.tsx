@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Product, ProductCategory, ProductBrand, Country, Currency, PurchasePricing } from '../types';
 import { useDynamicCategories, useDynamicBrands } from '../hooks/useDynamicOptions';
-import { roundToCurrency, addCurrency, multiplyCurrency, safeParseFloat, safeParseInt } from '../utils/mathUtils';
+import { addCurrency, multiplyCurrency, safeParseFloat, safeParseInt } from '../utils/mathUtils';
 
 
 interface AddProductFormProps {

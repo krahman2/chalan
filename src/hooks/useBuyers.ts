@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { Sale, StandaloneCredit, Payment } from '../types';
-import { roundToCurrency, addCurrency, subtractCurrency, ensureNonNegative } from '../utils/mathUtils';
+import { addCurrency, subtractCurrency, ensureNonNegative } from '../utils/mathUtils';
 
 /**
  * Hook to get all unique buyers from sales, standalone credits, and payments

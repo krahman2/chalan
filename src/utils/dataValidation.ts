@@ -1,4 +1,4 @@
-import type { Product, Sale, StandaloneCredit, Payment, SaleItem } from '../types';
+import type { Product, StandaloneCredit, Payment, SaleItem } from '../types';
 import { roundToCurrency, safeParseFloat, safeParseInt, currencyEquals } from './mathUtils';
 
 /**
