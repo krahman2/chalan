@@ -14,6 +14,7 @@ import { roundToCurrency, multiplyCurrency, ensureNonNegative } from './utils/ma
 import { validateProduct, validateSale, validateStandaloneCredit, validatePayment } from './utils/dataValidation';
 import { useOutstandingCredit } from './hooks/useBuyers';
 import ImportExportButtons from './components/ImportExportButtons';
+import PasscodeLock from './components/PasscodeLock';
 
 function App() {
   const [page, setPage] = useState<'inventory' | 'sales' | 'analysis'>('inventory');
@@ -24,6 +25,7 @@ function App() {
   const [standaloneCredits, setStandaloneCredits] = useState<StandaloneCredit[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUnlocked, setIsUnlocked] = useState(false);
 
   // Data consistency monitoring (in development)
   const consistencyReport = useDataConsistency(sales, standaloneCredits, payments);
@@ -297,6 +299,10 @@ function App() {
     }
   };
 
+  const handleUnlock = () => {
+    setIsUnlocked(true);
+  };
+
   const navButtonStyle = (isActive: boolean) => ({
     padding: '12px 24px',
     borderRadius: '8px',
@@ -322,6 +328,11 @@ function App() {
     transition: 'background-color 0.2s ease',
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
   });
+
+  // Show passcode lock if not unlocked
+  if (!isUnlocked) {
+    return <PasscodeLock onUnlock={handleUnlock} />;
+  }
 
   return (
     <div style={{

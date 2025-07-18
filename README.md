@@ -1,69 +1,84 @@
-# React + TypeScript + Vite
+# Chalan Inventory Management System
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A secure, modern inventory management system built with React, TypeScript, and Supabase for automotive parts businesses.
 
-Currently, two official plugins are available:
+## 🔐 Security Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Passcode Protection**: Secure access with iPhone-style lock screen (passcode: 13092000)
+- **Developer Tools Detection**: Basic protection against inspection
+- **Obfuscated Passcode**: Hard to find in source code
+- **Session Management**: Requires passcode on every page refresh
 
-## Expanding the ESLint configuration
+## 🚀 Features
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **Product Management**: Add, edit, and delete products with detailed pricing
+- **Sales Tracking**: Record sales with cash and credit amounts
+- **Credit Management**: Track outstanding credits and payments
+- **Inventory Analysis**: View profit margins and inventory value
+- **CSV Import/Export**: Bulk import products and export inventory data
+- **Responsive Design**: Works on desktop and mobile devices
+- **Real-time Data**: Supabase backend with automatic synchronization
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## 📱 Lock Screen
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+The app features a beautiful lock screen with:
+- Your custom wallpaper background
+- iPhone-style number pad
+- 8-digit passcode entry
+- Blur overlay for security
+- Error handling with shake animation
+- Security warnings for developer tools
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 🛠️ Technical Stack
+
+- **Frontend**: React 18 + TypeScript + Vite
+- **Backend**: Supabase (PostgreSQL + Real-time)
+- **Styling**: Inline styles with Tailwind-inspired design
+- **Security**: Obfuscated passcode validation
+- **Data**: LocalStorage fallback with database sync
+
+## 🚀 Getting Started
+
+1. **Clone the repository**
+2. **Install dependencies**: `npm install`
+3. **Set up Supabase**: Follow `SUPABASE_SETUP.md`
+4. **Add environment variables**: Create `.env.local` with your Supabase credentials
+5. **Run development server**: `npm run dev`
+6. **Enter passcode**: Use `13092000` to unlock the app
+
+## 📊 CSV Import Format
+
+Import products using CSV with this column order:
+```
+name,type,category,brand,country,purchasePrice,sellingPrice,quantity
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Example:
 ```
+Clutch Plate,TATA,Clutch & Pressure,Luk,India,2500.00,3000.00,10
+```
+
+## 🔧 Development
+
+- **Build**: `npm run build`
+- **Preview**: `npm run preview`
+- **Lint**: `npm run lint`
+
+## 📱 Mobile Support
+
+The app is fully responsive and works great on:
+- iOS Safari
+- Android Chrome
+- Desktop browsers
+- PWA installation support
+
+## 🔒 Security Notes
+
+- Passcode is obfuscated in source code
+- Developer tools detection provides basic protection
+- All data is validated before saving
+- Precise mathematical calculations prevent rounding errors
+
+## 📄 License
+
+Private business application - not for public distribution.
