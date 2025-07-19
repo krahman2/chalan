@@ -5,6 +5,7 @@ import { addCurrency, subtractCurrency, ensureNonNegative } from '../utils/mathU
 /**
  * Hook to get all unique buyers from sales, standalone credits, and payments
  * This ensures consistent buyer lists across all components
+ * NOTE: This includes ALL buyers, even those with no active records
  */
 export const useAllBuyers = (
   sales: Sale[], 
@@ -61,6 +62,37 @@ export const useOutstandingCredit = (
     
     return creditMap;
   }, [sales, standaloneCredits, payments]);
+};
+
+/**
+ * Hook to get only active buyers - those with sales, credits, or outstanding balances
+ * This filters out buyers who have no relevant activity (like test buyers)
+ */
+export const useActiveBuyers = (
+  sales: Sale[], 
+  standaloneCredits: StandaloneCredit[], 
+  payments: Payment[]
+) => {
+  const outstandingCredit = useOutstandingCredit(sales, standaloneCredits, payments);
+  
+  return useMemo(() => {
+    const activeBuyers = new Set<string>();
+    
+    // Add buyers who have sales records
+    sales.forEach(sale => activeBuyers.add(sale.buyerName));
+    
+    // Add buyers who have standalone credits
+    standaloneCredits.forEach(credit => activeBuyers.add(credit.buyerName));
+    
+    // Add buyers who have outstanding credit (even if no current sales/credits)
+    outstandingCredit.forEach((amount, buyerName) => {
+      if (amount > 0) {
+        activeBuyers.add(buyerName);
+      }
+    });
+    
+    return Array.from(activeBuyers).sort();
+  }, [sales, standaloneCredits, outstandingCredit]);
 };
 
 /**

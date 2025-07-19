@@ -4,7 +4,7 @@ import { formatBDT } from '../utils/currency';
 import Modal from '../components/Modal';
 import AddCreditForm from '../components/AddCreditForm';
 import AddPaymentForm from '../components/AddPaymentForm';
-import { useAllBuyers, useOutstandingCredit } from '../hooks/useBuyers';
+import { useActiveBuyers, useOutstandingCredit } from '../hooks/useBuyers';
 import { PaymentService, CreditService } from '../services/database';
 
 interface SalesHistoryProps {
@@ -172,8 +172,8 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({
     }
   };
 
-  // Use universal buyer hook for consistent buyer lists
-  const uniqueBuyers = useAllBuyers(sales, standaloneCredits, payments);
+  // Use active buyer hook to filter out buyers with no relevant activity
+  const uniqueBuyers = useActiveBuyers(sales, standaloneCredits, payments);
 
   const filteredSales = useMemo(() => {
     return sales.filter(sale => {
@@ -1052,7 +1052,7 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({
               style={filterStyle}
             >
               <option value="All">All Buyers</option>
-              {uniqueBuyers.map(buyer => (
+              {uniqueBuyers.map((buyer: string) => (
                 <option key={buyer} value={buyer}>{buyer}</option>
               ))}
             </select>
