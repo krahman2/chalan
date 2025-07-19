@@ -4,7 +4,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 import InventoryAnalysis from '../pages/InventoryAnalysis'
 import Dashboard from '../components/Dashboard'
 import ImportExportButtons from '../components/ImportExportButtons'
-import type { Product, Sale, StandaloneCredit, Payment } from '../types'
+import type { Product, Sale } from '../types'
 
 // Mock the database service
 vi.mock('../services/database', () => ({

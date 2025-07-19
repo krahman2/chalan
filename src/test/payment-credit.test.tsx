@@ -454,7 +454,7 @@ describe('Payment & Credit Management', () => {
         creditAmount: 1000,
         description: 'Test credit',
         date: '2024-01-01T00:00:00.000Z',
-        isStandalone: true
+        isStandalone: true as const
       }
 
       await CreditService.createStandaloneCredit(creditData)

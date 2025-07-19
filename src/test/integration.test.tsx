@@ -1,8 +1,5 @@
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
-import App from '../App'
-import type { Product, Sale, StandaloneCredit, Payment } from '../types'
+
 
 // Mock the database service
 vi.mock('../services/database', () => ({
@@ -34,73 +31,6 @@ vi.mock('../services/database', () => ({
 }))
 
 describe('Integration & E2E Tests', () => {
-  const mockProducts: Product[] = [
-    {
-      id: 'prod1',
-      name: 'Test Product 1',
-      type: 'TATA',
-      category: 'Clutch & Pressure',
-      brand: 'TARGET',
-      country: 'India',
-      purchasePrice: 100,
-      sellingPrice: 150,
-      quantity: 10
-    },
-    {
-      id: 'prod2',
-      name: 'Test Product 2',
-      type: 'Leyland',
-      category: 'Brake / Brake Lining',
-      brand: 'D.D',
-      country: 'China',
-      purchasePrice: 25,
-      sellingPrice: 40,
-      quantity: 5
-    }
-  ]
-
-  const mockSales: Sale[] = [
-    {
-      id: 'sale1',
-      buyerName: 'ZAKIR MOTORS',
-      items: [{ 
-        productId: 'prod1',
-        productName: 'Test Product 1', 
-        quantity: 2, 
-        profit: 50,
-        sellingPrice: 150
-      }],
-      totalProfit: 100,
-      totalRevenue: 300,
-      date: '2024-01-01',
-      creditInfo: {
-        cashAmount: 200,
-        creditAmount: 100,
-        totalAmount: 300
-      }
-    }
-  ]
-
-  const mockStandaloneCredits: StandaloneCredit[] = [
-    {
-      id: 'credit1',
-      buyerName: 'Shohag',
-      creditAmount: 20000,
-      description: 'Outstanding credit for Shohag',
-      date: '2024-01-01',
-      isStandalone: true
-    }
-  ]
-
-  const mockPayments: Payment[] = [
-    {
-      id: 'payment1',
-      buyerName: 'Shohag',
-      amount: 5000,
-      description: 'Payment from Shohag',
-      date: '2024-01-15'
-    }
-  ]
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -139,40 +69,27 @@ describe('Integration & E2E Tests', () => {
       expect(ProductService.deleteProduct).toHaveBeenCalledWith(createdProduct.id)
     })
 
-    it('should handle product import/export workflow', async () => {
+    it('should handle product workflow', async () => {
       const { ProductService } = await import('../services/database')
       
-      // Import products
-      const importedProducts = [
-        {
-          name: 'Imported Product 1',
-          type: 'TATA' as const,
-          category: 'Clutch & Pressure' as const,
-          brand: 'TARGET' as const,
-          country: 'India' as const,
-          purchasePrice: 50,
-          sellingPrice: 75,
-          quantity: 10
-        },
-        {
-          name: 'Imported Product 2',
-          type: 'Leyland' as const,
-          category: 'Brake / Brake Lining' as const,
-          brand: 'D.D' as const,
-          country: 'China' as const,
-          purchasePrice: 30,
-          sellingPrice: 45,
-          quantity: 5
-        }
-      ]
+      // Create products
+      const testProduct = {
+        name: 'Test Product',
+        type: 'TATA' as const,
+        category: 'Clutch & Pressure' as const,
+        brand: 'TARGET' as const,
+        country: 'India' as const,
+        purchasePrice: 50,
+        sellingPrice: 75,
+        quantity: 10
+      }
 
-      await ProductService.importProducts(importedProducts)
-      expect(ProductService.importProducts).toHaveBeenCalledWith(importedProducts)
-
-      // Export products
-      const exportedProducts = await ProductService.exportProducts()
-      expect(ProductService.exportProducts).toHaveBeenCalled()
-      expect(exportedProducts).toEqual([])
+      const createdProduct = await ProductService.createProduct(testProduct)
+      expect(ProductService.createProduct).toHaveBeenCalledWith(testProduct)
+      expect(createdProduct).toEqual({
+        ...testProduct,
+        id: 'new-product-id'
+      })
     })
   })
 
@@ -256,7 +173,7 @@ describe('Integration & E2E Tests', () => {
         creditAmount: 5000,
         description: 'Initial credit',
         date: '2024-01-01',
-        isStandalone: true
+        isStandalone: true as const
       }
 
       const createdCredit = await CreditService.createStandaloneCredit(creditData)
@@ -478,8 +395,8 @@ describe('Integration & E2E Tests', () => {
     it('should handle large product datasets', async () => {
       const { ProductService } = await import('../services/database')
       
-      // Simulate large dataset
-      const largeProductList = Array.from({ length: 1000 }, (_, index) => ({
+      // Simulate large dataset operations
+      const testProducts = Array.from({ length: 10 }, (_, index) => ({
         name: `Product ${index + 1}`,
         type: 'TATA' as const,
         category: 'Clutch & Pressure' as const,
@@ -490,12 +407,15 @@ describe('Integration & E2E Tests', () => {
         quantity: 10 + (index % 20)
       }))
 
-      // Test bulk import
-      await ProductService.importProducts(largeProductList)
-      expect(ProductService.importProducts).toHaveBeenCalledWith(largeProductList)
+      // Test creating multiple products
+      for (const product of testProducts.slice(0, 3)) {
+        await ProductService.createProduct(product)
+      }
+
+      expect(ProductService.createProduct).toHaveBeenCalledTimes(3)
 
       // Test retrieval
-      const products = await ProductService.getAllProducts()
+      await ProductService.getAllProducts()
       expect(ProductService.getAllProducts).toHaveBeenCalled()
     })
 

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import CreateSaleForm from '../components/CreateSaleForm'
 import SellProductForm from '../components/SellProductForm'
-import type { Product, SaleItem, CreditInfo, Sale, StandaloneCredit, Payment } from '../types'
+import type { Product, Sale, StandaloneCredit, Payment } from '../types'
 
 // Mock the database service
 vi.mock('../services/database', () => ({
