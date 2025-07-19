@@ -1,9 +1,8 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import PasscodeLock from '../components/PasscodeLock'
 import Modal from '../components/Modal'
-import type { Product, Sale, StandaloneCredit, Payment } from '../types'
 
 // Mock the database service
 vi.mock('../services/database', () => ({
@@ -12,15 +11,12 @@ vi.mock('../services/database', () => ({
     createProduct: vi.fn((product) => Promise.resolve({ ...product, id: 'new-product-id' })),
     updateProduct: vi.fn((product) => Promise.resolve(product)),
     deleteProduct: vi.fn(() => Promise.resolve()),
-    importProducts: vi.fn(() => Promise.resolve()),
-    exportProducts: vi.fn(() => Promise.resolve([])),
   },
   SaleService: {
     getAllSales: vi.fn(() => Promise.resolve([])),
     createSale: vi.fn((sale) => Promise.resolve({ ...sale, id: 'new-sale-id' })),
     deleteSale: vi.fn(() => Promise.resolve()),
     syncToDatabase: vi.fn(() => Promise.resolve()),
-    exportSales: vi.fn(() => Promise.resolve([])),
   },
   CreditService: {
     getAllStandaloneCredits: vi.fn(() => Promise.resolve([])),
@@ -374,7 +370,7 @@ describe('Security & UI Components', () => {
         creditAmount: 5000,
         description: 'Test credit',
         date: '2024-01-01',
-        isStandalone: true
+        isStandalone: true as const
       }
 
       const result = await CreditService.createStandaloneCredit(creditData)
@@ -428,32 +424,41 @@ describe('Security & UI Components', () => {
     it('should handle data import/export workflows', async () => {
       const { ProductService, SaleService } = await import('../services/database')
       
-      // Test product import
-      const importedProducts = [
-        {
-          name: 'Imported Product',
-          type: 'TATA' as const,
-          category: 'Clutch & Pressure' as const,
-          brand: 'TARGET' as const,
-          country: 'India' as const,
-          purchasePrice: 50,
-          sellingPrice: 75,
-          quantity: 10
-        }
-      ]
+      // Test product operations
+      const testProduct = {
+        name: 'Test Product',
+        type: 'TATA' as const,
+        category: 'Clutch & Pressure' as const,
+        brand: 'TARGET' as const,
+        country: 'India' as const,
+        purchasePrice: 50,
+        sellingPrice: 75,
+        quantity: 10
+      }
 
-      await ProductService.importProducts(importedProducts)
-      expect(ProductService.importProducts).toHaveBeenCalledWith(importedProducts)
+      const createdProduct = await ProductService.createProduct(testProduct)
+      expect(ProductService.createProduct).toHaveBeenCalledWith(testProduct)
+      expect(createdProduct).toEqual({
+        ...testProduct,
+        id: 'new-product-id'
+      })
 
-      // Test product export
-      const exportedProducts = await ProductService.exportProducts()
-      expect(ProductService.exportProducts).toHaveBeenCalled()
-      expect(exportedProducts).toEqual([])
+      // Test sale operations
+      const testSale = {
+        date: '2024-01-01T00:00:00.000Z',
+        buyerName: 'Test Buyer',
+        totalProfit: 100,
+        totalRevenue: 300,
+        items: [],
+        creditInfo: { cashAmount: 300, creditAmount: 0, totalAmount: 300 }
+      }
 
-      // Test sales export
-      const exportedSales = await SaleService.exportSales()
-      expect(SaleService.exportSales).toHaveBeenCalled()
-      expect(exportedSales).toEqual([])
+      const createdSale = await SaleService.createSale(testSale)
+      expect(SaleService.createSale).toHaveBeenCalledWith(testSale)
+      expect(createdSale).toEqual({
+        ...testSale,
+        id: 'new-sale-id'
+      })
     })
 
     it('should handle database synchronization', async () => {

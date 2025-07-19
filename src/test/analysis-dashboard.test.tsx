@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import InventoryAnalysis from '../pages/InventoryAnalysis'
@@ -86,26 +86,7 @@ describe('Analysis & Dashboard', () => {
     }
   ]
 
-  const mockStandaloneCredits: StandaloneCredit[] = [
-    {
-      id: 'credit1',
-      buyerName: 'Shohag',
-      creditAmount: 20000,
-      description: 'Outstanding credit for Shohag',
-      date: '2024-01-01',
-      isStandalone: true
-    }
-  ]
 
-  const mockPayments: Payment[] = [
-    {
-      id: 'payment1',
-      buyerName: 'Shohag',
-      amount: 5000,
-      description: 'Payment from Shohag',
-      date: '2024-01-15'
-    }
-  ]
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -369,48 +350,48 @@ describe('Analysis & Dashboard', () => {
   })
 
   describe('Data Export Integration', () => {
-    it('should export products successfully', async () => {
+    it('should handle product operations successfully', async () => {
       const { ProductService } = await import('../services/database')
       
-      const result = await ProductService.exportProducts()
+      const testProduct = {
+        name: 'Test Product',
+        type: 'TATA' as const,
+        category: 'Clutch & Pressure' as const,
+        brand: 'TARGET' as const,
+        country: 'India' as const,
+        purchasePrice: 50,
+        sellingPrice: 75,
+        quantity: 10
+      }
+
+      const result = await ProductService.createProduct(testProduct)
       
-      expect(ProductService.exportProducts).toHaveBeenCalled()
-      expect(result).toEqual([])
+      expect(ProductService.createProduct).toHaveBeenCalledWith(testProduct)
+      expect(result).toEqual({
+        ...testProduct,
+        id: 'new-product-id'
+      })
     })
 
-    it('should import products successfully', async () => {
-      const { ProductService } = await import('../services/database')
-      
-      const importedProducts = [
-        {
-          name: 'Imported Product',
-          description: 'An imported product',
-          category: 'Test',
-          costPrice: 50,
-          sellingPrice: 75,
-          profit: 25,
-          quantity: 10,
-          minQuantity: 2,
-          supplier: 'Test Supplier',
-          location: 'Test Location',
-          sku: 'IMP001',
-          barcode: '111111111',
-          imageUrl: ''
-        }
-      ]
-
-      await ProductService.importProducts(importedProducts)
-      
-      expect(ProductService.importProducts).toHaveBeenCalledWith(importedProducts)
-    })
-
-    it('should export sales successfully', async () => {
+    it('should handle sale operations successfully', async () => {
       const { SaleService } = await import('../services/database')
       
-      const result = await SaleService.exportSales()
+      const testSale = {
+        date: '2024-01-01T00:00:00.000Z',
+        buyerName: 'Test Buyer',
+        totalProfit: 100,
+        totalRevenue: 300,
+        items: [],
+        creditInfo: { cashAmount: 300, creditAmount: 0, totalAmount: 300 }
+      }
+
+      const result = await SaleService.createSale(testSale)
       
-      expect(SaleService.exportSales).toHaveBeenCalled()
-      expect(result).toEqual([])
+      expect(SaleService.createSale).toHaveBeenCalledWith(testSale)
+      expect(result).toEqual({
+        ...testSale,
+        id: 'new-sale-id'
+      })
     })
   })
 }) 

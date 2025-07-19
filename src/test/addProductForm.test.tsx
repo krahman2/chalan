@@ -1,8 +1,8 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import AddProductForm from '../components/AddProductForm'
-import type { Product } from '../types'
+
 
 describe('AddProductForm Component', () => {
   const mockOnAddProduct = vi.fn()

@@ -283,9 +283,7 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({
     return filtered;
   }, [allCreditTransactions, buyerFilter, searchTerm, timeFilter, selectedYear, selectedMonth]);
 
-  const creditSales = useMemo(() => {
-    return filteredSales.filter(sale => sale.creditInfo.creditAmount > 0);
-  }, [filteredSales]);
+
 
   // Calculate summary statistics for the current period
   const periodStats = useMemo(() => {
