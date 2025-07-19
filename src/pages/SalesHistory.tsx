@@ -28,6 +28,7 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({
   onDeletePayment,
   onDeleteCredit
 }) => {
+
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
   const [showCreditView, setShowCreditView] = useState(false);
   const [buyerFilter, setBuyerFilter] = useState<string>('All');
@@ -252,12 +253,14 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({
       });
     });
     
+
+    
     return transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [sales, standaloneCredits, payments]);
 
   // Filter credit transactions
   const filteredCreditTransactions = useMemo(() => {
-    return allCreditTransactions.filter(transaction => {
+    const filtered = allCreditTransactions.filter(transaction => {
       const matchesBuyer = buyerFilter === 'All' || transaction.buyerName === buyerFilter;
       const matchesSearch = transaction.buyerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -274,6 +277,10 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({
       
       return matchesBuyer && matchesSearch && matchesTime;
     });
+    
+
+    
+    return filtered;
   }, [allCreditTransactions, buyerFilter, searchTerm, timeFilter, selectedYear, selectedMonth]);
 
   const creditSales = useMemo(() => {
@@ -1043,7 +1050,7 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({
                 color: showCreditView ? 'white' : '#3b82f6',
               }}
             >
-              💳 Credit Tracking ({creditSales.length})
+              💳 Credit Tracking ({allCreditTransactions.length})
             </button>
 
             <select
@@ -1264,34 +1271,36 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({
           </div>
         )}
 
-        {sales.length === 0 ? (
-          <div style={{
-            textAlign: 'center',
-            padding: '64px 24px',
-          }}>
+        {showCreditView ? renderCreditView() : (
+          sales.length === 0 ? (
             <div style={{
-              fontSize: '48px',
-              marginBottom: '16px',
+              textAlign: 'center',
+              padding: '64px 24px',
             }}>
-              📈
+              <div style={{
+                fontSize: '48px',
+                marginBottom: '16px',
+              }}>
+                📈
+              </div>
+              <p style={{
+                color: '#6b7280',
+                fontSize: '20px',
+                fontWeight: '500',
+                marginBottom: '8px',
+              }}>
+                No sales recorded yet.
+              </p>
+              <p style={{
+                color: '#9ca3af',
+                fontSize: '16px',
+                margin: '0',
+              }}>
+                Create your first sale to start tracking your revenue!
+              </p>
             </div>
-            <p style={{
-              color: '#6b7280',
-              fontSize: '20px',
-              fontWeight: '500',
-              marginBottom: '8px',
-            }}>
-              No sales recorded yet.
-            </p>
-            <p style={{
-              color: '#9ca3af',
-              fontSize: '16px',
-              margin: '0',
-            }}>
-              Create your first sale to start tracking your revenue!
-            </p>
-          </div>
-        ) : showCreditView ? renderCreditView() : renderMainView()}
+          ) : renderMainView()
+        )}
       </div>
 
       {/* Add Credit Modal */}
